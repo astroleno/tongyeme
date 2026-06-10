@@ -1,0 +1,11 @@
+{
+  "name": "tongye-guanmi-site",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve-static-site.mjs",
+    "dev:web": "node scripts/serve-static-site.mjs",
+    "verify:ink-modules": "node scripts/check-ink-modules.mjs"
+  }
+}
