@@ -7,6 +7,7 @@ export function createInkSceneTransition(canvas, options = {}) {
     const targetSrc = options.targetSrc || assets.nextSceneSrc || '';
     const farOnly = options.farOnly ? 1 : 0;
     const hideAtEnd = Boolean(options.hideAtEnd);
+    const edgeOnly = options.edgeOnly ? 1 : 0;
     const colorLift = clamp(options.colorLift ?? 0, 0, 1);
 
     const gl = canvas.getContext('webgl', {
@@ -49,6 +50,7 @@ export function createInkSceneTransition(canvas, options = {}) {
       uniform vec2 uInkCenter;
       uniform float uProgressSpan;
       uniform float uColorLift;
+      uniform float uEdgeOnly;
       uniform vec4 uImageRect;
       uniform float uUseImageRect;
       uniform sampler2D uFigureMask;
@@ -125,9 +127,19 @@ export function createInkSceneTransition(canvas, options = {}) {
           * step(figureUv.x, 1.0)
           * step(0.0, figureUv.y)
           * step(figureUv.y, 1.0);
-        float figureAlpha = texture2D(uFigureMask, figureUv).a * figureInside * uFigureReady * uUseFigureMask * (1.0 - uFarOnly);
-        float figureMask = smoothstep(0.035, 0.42, figureAlpha);
+        vec4 figureTex = texture2D(uFigureMask, figureUv);
+        float figureMin = min(min(figureTex.r, figureTex.g), figureTex.b);
+        float figureMax = max(max(figureTex.r, figureTex.g), figureTex.b);
+        float figureChroma = figureMax - figureMin;
+        float figureLuma = dot(figureTex.rgb, vec3(0.2126, 0.7152, 0.0722));
+        float keyedFigureAlpha = max(
+          smoothstep(0.070, 0.265, distance(figureTex.rgb, vec3(1.0))),
+          smoothstep(0.028, 0.145, figureChroma) * smoothstep(0.995, 0.72, figureLuma)
+        );
+        float figureAlpha = min(figureTex.a, keyedFigureAlpha) * figureInside * uFigureReady * uUseFigureMask * (1.0 - uFarOnly);
+        float figureMask = smoothstep(0.035, 0.36, figureAlpha);
         float figureCore = smoothstep(0.30, 0.88, figureAlpha);
+        float figureEdge = figureMask * (1.0 - smoothstep(0.22, 0.72, figureAlpha));
         float figureAspect = max(0.34, uFigureRect.z / max(uFigureRect.w, 0.001));
         vec2 figureAspectUv = vec2(figureUv.x * figureAspect, figureUv.y);
         float figureField = fbm(figureAspectUv * 9.2 + warp * 2.2 + vec2(uTime * 0.040, -uTime * 0.026)) * 0.64;
@@ -135,12 +147,12 @@ export function createInkSceneTransition(canvas, options = {}) {
         float figureInk = smoothstep(0.42, 0.84, figureField);
         float figureWindow = smoothstep(0.0, 0.055, p) * (1.0 - smoothstep(0.28, 0.48, p));
         float figureSpread = smoothstep(0.10, 0.50, p + figureField * 0.16);
-        float figureSeed = figureMask * figureInk * figureSpread * figureWindow;
-        float figureIgnite = figureMask
+        float figureSeed = figureEdge * figureInk * figureSpread * figureWindow;
+        float figureIgnite = figureEdge
           * smoothstep(0.34, 0.74, figureField)
           * smoothstep(0.0, 0.045, p)
           * (1.0 - smoothstep(0.30, 0.54, p));
-        float figureAura = figureMask
+        float figureAura = figureEdge
           * (0.30 + figureInk * 0.70)
           * smoothstep(0.0, 0.045, p)
           * (1.0 - smoothstep(0.30, 0.50, p));
@@ -200,10 +212,11 @@ export function createInkSceneTransition(canvas, options = {}) {
         float openingBreakup = smoothstep(0.30, 0.72, fbm(aspectUv * 8.4 + warp * 2.6 - uTime * 0.08));
         openingBreakup *= smoothstep(0.22, 0.62, fbm(aspectUv * 23.0 - warp * 3.4 + uTime * 0.13));
         float openingSpatter = smoothstep(0.70, 0.975, hash(floor((aspectUv + warp * 0.68) * uResolution.y * 0.052 + uTime * 4.4)));
-        float openingInkMask = clamp(max(openingBreakup * 0.95 + openingSpatter * 0.50, figureInk * figureMask * 0.86), 0.0, 1.0);
+        float sceneEdgeMask = clamp(softBand * 1.10 + hotBand * 1.32 + nearSoftBand * 0.92 + ember * 0.55, 0.0, 1.0);
+        float openingInkMask = clamp(max((openingBreakup * 0.95 + openingSpatter * 0.50) * sceneEdgeMask, figureInk * figureEdge * 0.86), 0.0, 1.0);
         float continuousGlow = softBand * (0.32 + energy * 0.30) + hotBand * (0.34 + energy * 0.28) + ember * 0.58;
         glow = mix(continuousGlow, continuousGlow * openingInkMask * 0.18 + figureSeed * 0.13 + figureIgnite * 0.20, ringSuppress);
-        float interiorGlow = smoothstep(0.18, 0.54, dissolve) * (1.0 - figureMask * ringSuppress * 0.68);
+        float interiorGlow = smoothstep(0.18, 0.54, dissolve) * (softBand * 0.22 + hotBand * 0.36 + figureEdge * 0.42) * (1.0 - figureMask * ringSuppress * 0.68);
         float figureFlash = figureSeed * (0.38 + figureCore * 0.18) + figureIgnite * (0.56 + figureCore * 0.16);
         float farFlashFactor = mix(0.58, 0.76, clamp(uColorLift, 0.0, 1.0));
         float openingFlash = (figureFlash * 0.92 + interiorGlow * 0.78 + ember * 0.24)
@@ -243,6 +256,8 @@ export function createInkSceneTransition(canvas, options = {}) {
         alpha += figureAura * 0.24;
         alpha += openingFlash * 0.16;
         alpha += smoothstep(0.90, 1.0, p) * 0.08;
+        float edgeOnlyAlpha = edgeAlpha * 2.55 + figureAura * 0.62 + openingFlash * 0.34 + sceneEdgeMask * openingInkMask * 0.20;
+        alpha = mix(alpha, edgeOnlyAlpha, uEdgeOnly);
         alpha = clamp(alpha, 0.0, 1.0);
 
         gl_FragColor = vec4(color, alpha);
@@ -297,6 +312,7 @@ export function createInkSceneTransition(canvas, options = {}) {
         inkCenter: gl.getUniformLocation(program, 'uInkCenter'),
         progressSpan: gl.getUniformLocation(program, 'uProgressSpan'),
         colorLift: gl.getUniformLocation(program, 'uColorLift'),
+        edgeOnly: gl.getUniformLocation(program, 'uEdgeOnly'),
         imageRect: gl.getUniformLocation(program, 'uImageRect'),
       useImageRect: gl.getUniformLocation(program, 'uUseImageRect'),
       figureMask: gl.getUniformLocation(program, 'uFigureMask'),
@@ -440,6 +456,7 @@ export function createInkSceneTransition(canvas, options = {}) {
           gl.uniform2f(uniforms.inkCenter, options.inkCenterX || 0.50, options.inkCenterY || 0.54);
           gl.uniform1f(uniforms.progressSpan, options.progressSpan || 1.16);
           gl.uniform1f(uniforms.colorLift, colorLift);
+          gl.uniform1f(uniforms.edgeOnly, edgeOnly);
         const canvasRect = canvas.getBoundingClientRect();
         const sourceRect = options.sourceElement?.getBoundingClientRect?.();
         const useImageRect = sourceRect && sourceRect.width > 0 && sourceRect.height > 0 && canvasRect.width > 0 && canvasRect.height > 0;

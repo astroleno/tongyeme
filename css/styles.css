@@ -431,8 +431,8 @@ body.is-loader-text-ready .loader-marquee-clear {
   height: min(88vh, 980px);
   object-fit: contain;
   transform: translate3d(-50%, calc(-50% + 12vh), 0) scale(1);
-  mix-blend-mode: normal;
-  filter: url('#figure-alpha-clean') blur(20px) brightness(1.18) saturate(1.08) contrast(1.03);
+  mix-blend-mode: multiply;
+  filter: url('#figure-alpha-clean') blur(20px) brightness(1.36) saturate(1.14) contrast(1.10);
   opacity: 1;
   -webkit-mask-image:
     linear-gradient(90deg, transparent 0, #000 2.4%, #000 97.6%, transparent 100%),

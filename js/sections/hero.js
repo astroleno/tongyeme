@@ -182,7 +182,9 @@ export function initLayeredHero(options = {}) {
       middleDepthSrc: HERO_MIDDLE_DEPTH_SRC
     },
     targetSrc: HERO_NEXT_SCENE_SRC,
-    figureMaskElement: figure
+    figureMaskElement: figure,
+    edgeOnly: true,
+    hideAtEnd: true
   });
 
   if (!hero || !scene || !back || !middle || !figure || !content) return;
@@ -487,7 +489,7 @@ export function initLayeredHero(options = {}) {
 
     back.style.filter = `blur(${farBlur.toFixed(2)}px) saturate(${(0.88 + introClarity * 0.11 + farClarity * 0.08).toFixed(3)}) contrast(${(0.93 + introClarity * 0.06 + farClarity * 0.06).toFixed(3)}) brightness(${(0.20 + introClarity * 0.44 + farClarity * 0.24).toFixed(3)})`;
     middle.style.filter = `blur(${rockBlur.toFixed(2)}px) saturate(${(0.94 + rockClarity * 0.12).toFixed(3)}) contrast(${(0.97 + rockClarity * 0.07).toFixed(3)}) brightness(${(0.90 + rockClarity * 0.32).toFixed(3)})`;
-    figure.style.filter = `url('#figure-alpha-clean') blur(${figureBlur.toFixed(2)}px) brightness(1.18) saturate(1.08) contrast(1.03)`;
+    figure.style.filter = `url('#figure-alpha-clean') blur(${figureBlur.toFixed(2)}px) brightness(1.36) saturate(1.14) contrast(1.10)`;
 
     if (middleNearBlur) {
       setMiddleNearBlurOpacity(0.24 * nearBlurStrength);
