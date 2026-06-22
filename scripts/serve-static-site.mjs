@@ -21,6 +21,7 @@ const mimeTypes = new Map([
   ['.svg', 'image/svg+xml; charset=utf-8'],
   ['.txt', 'text/plain; charset=utf-8'],
   ['.webm', 'video/webm'],
+  ['.webp', 'image/webp'],
   ['.woff', 'font/woff'],
   ['.woff2', 'font/woff2']
 ])
@@ -57,8 +58,13 @@ const server = createServer(async (request, response) => {
 listenOnAvailablePort(preferredPort)
 
 function resolvePath(pathname) {
+  const cleanedPath = pathname.replace(/^\/+/, '').replace(/\/+$/, '')
+  const fileName = cleanedPath
+    ? (extname(cleanedPath) ? cleanedPath : `${cleanedPath}.html`)
+    : 'index.html'
+
   return {
-    filePath: normalize(join(siteRoot, pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, ''))),
+    filePath: normalize(join(siteRoot, fileName)),
     rootPath: siteRoot
   }
 }
@@ -114,7 +120,15 @@ function sendText(response, status, body) {
 }
 
 function listenOnAvailablePort(port) {
-  server.once('error', (error) => {
+  const onListening = () => {
+    server.off('error', onError)
+    console.log(`Serving ${siteRoot}`)
+    console.log(`Local: http://localhost:${port}`)
+  }
+
+  const onError = (error) => {
+    server.off('listening', onListening)
+
     if (error.code === 'EADDRINUSE' && port < preferredPort + 20) {
       listenOnAvailablePort(port + 1)
       return
@@ -122,10 +136,9 @@ function listenOnAvailablePort(port) {
 
     console.error(error)
     process.exitCode = 1
-  })
+  }
 
-  server.listen(port, host, () => {
-    console.log(`Serving ${siteRoot}`)
-    console.log(`Local: http://localhost:${port}`)
-  })
+  server.once('error', onError)
+  server.once('listening', onListening)
+  server.listen(port, host)
 }

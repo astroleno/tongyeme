@@ -17,20 +17,23 @@ export function initVanillaReveal() {
 export function initGsapTextAndUI({ root = document.documentElement } = {}) {
   const { gsap, ScrollTrigger } = window;
   gsap.registerPlugin(ScrollTrigger);
+  ScrollTrigger.config({
+    limitCallbacks: true,
+    ignoreMobileResize: true
+  });
 
-  gsap.set('.reveal', { autoAlpha: 0, y: 64, rotateX: 3, transformPerspective: 800 });
+  gsap.set('.reveal', { autoAlpha: 0, y: 24 });
   gsap.utils.toArray('.reveal').forEach((el) => {
     gsap.to(el, {
       autoAlpha: 1,
       y: 0,
-      rotateX: 0,
-      duration: 1.15,
+      duration: 0.62,
       ease: 'power3.out',
       scrollTrigger: {
         trigger: el,
         start: 'top 84%',
         end: 'bottom 20%',
-        toggleActions: 'play none none reverse'
+        toggleActions: 'play none none none'
       }
     });
   });
@@ -48,15 +51,37 @@ export function initGsapTextAndUI({ root = document.documentElement } = {}) {
     });
   });
 
+  const navElement = document.querySelector('.site-nav');
+  const themedSections = gsap.utils.toArray('[data-section-theme]');
+  if (navElement && themedSections.length) {
+    const setNavTone = (section) => {
+      const tone = section?.dataset.sectionTheme === 'light' ? 'light' : 'dark';
+      navElement.dataset.tone = tone;
+      navElement.classList.toggle('is-on-light', tone === 'light');
+    };
+
+    themedSections.forEach((section) => {
+      ScrollTrigger.create({
+        trigger: section,
+        start: 'top 14%',
+        end: 'bottom 14%',
+        onEnter: () => setNavTone(section),
+        onEnterBack: () => setNavTone(section)
+      });
+    });
+
+    const toneProbe = window.innerHeight * 0.14;
+    const currentSection = themedSections.find((section) => {
+      const rect = section.getBoundingClientRect();
+      return rect.top <= toneProbe && rect.bottom > toneProbe;
+    });
+    if (currentSection) setNavTone(currentSection);
+  }
+
   ScrollTrigger.create({
     trigger: document.body,
     start: 0,
     end: () => document.documentElement.scrollHeight - window.innerHeight,
     onUpdate: (self) => root.style.setProperty('--page-progress', self.progress.toFixed(4))
   });
-}
-
-export function initSmoothScroll() {
-  window.gsap?.ticker?.lagSmoothing?.(0);
-  return null;
 }

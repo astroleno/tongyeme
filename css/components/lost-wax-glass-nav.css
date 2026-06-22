@@ -1,0 +1,221 @@
+.site-nav {
+  --nav-fg: rgba(247, 237, 215, 0.82);
+  --nav-fg-strong: rgba(247, 237, 215, 0.96);
+  --nav-fg-muted: rgba(247, 237, 215, 0.56);
+  --nav-cta-bg: rgba(247, 237, 215, 0.92);
+  --nav-cta-fg: #06100d;
+
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  width: 100vw;
+  color: var(--nav-fg);
+  background: transparent;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate3d(0, -14px, 0);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.site-nav::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  width: 100vw;
+  height: 96px;
+  background: linear-gradient(180deg, rgba(5, 8, 7, 0.72), rgba(5, 8, 7, 0.30) 48%, rgba(5, 8, 7, 0));
+  opacity: .86;
+  pointer-events: none;
+}
+
+.site-nav[data-tone="light"],
+.site-nav.is-on-light {
+  --nav-fg: rgba(6, 16, 13, 0.72);
+  --nav-fg-strong: rgba(6, 16, 13, 0.94);
+  --nav-fg-muted: rgba(6, 16, 13, 0.56);
+  --nav-cta-bg: #06100d;
+  --nav-cta-fg: #f7edd7;
+}
+
+.site-nav[data-tone="light"]::before,
+.site-nav.is-on-light::before {
+  background: linear-gradient(180deg, rgba(247, 237, 215, 0.66), rgba(247, 237, 215, 0.28) 48%, rgba(247, 237, 215, 0));
+}
+
+.site-nav-track {
+  position: relative;
+  z-index: 1;
+  width: min(1680px, 100vw);
+  height: var(--nav-h);
+  margin-inline: auto;
+  padding: 10px clamp(12px, 1vw, 20px);
+  display: flex;
+  align-items: center;
+  gap: clamp(22px, 2.4vw, 40px);
+}
+
+.brand {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  color: var(--nav-fg-strong);
+}
+
+.brand-mark {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  border: 1px solid rgba(232, 213, 154, 0.18);
+  color: var(--gold);
+  font-family: ui-serif, "Songti SC", "STSong", serif;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.brand-text {
+  font-size: 12px;
+  font-weight: 760;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.nav-links {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: clamp(22px, 2.4vw, 34px);
+  min-width: 0;
+}
+
+.nav-links::before,
+.nav-links::after {
+  content: none !important;
+}
+
+.nav-links a {
+  position: relative;
+  color: var(--nav-fg-muted);
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1;
+  letter-spacing: .08em;
+  padding: 10px 0;
+  transition: color .22s ease;
+}
+
+.nav-links a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 3px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  opacity: .72;
+  transition: transform .22s ease;
+}
+
+.nav-links a:hover,
+.nav-links a:focus-visible,
+.nav-links a.is-active {
+  color: var(--nav-fg-strong);
+}
+
+.nav-links a:hover::after,
+.nav-links a:focus-visible::after,
+.nav-links a.is-active::after {
+  transform: scaleX(1);
+}
+
+.nav-cta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 92px;
+  min-height: 32px;
+  padding: 0 15px;
+  border-radius: 999px;
+  background: var(--nav-cta-bg);
+  color: var(--nav-cta-fg);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  transition: transform .22s ease, background .22s ease, color .22s ease;
+}
+
+.nav-cta:hover,
+.nav-cta:focus-visible {
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-links a,
+  .nav-links a::after,
+  .nav-cta {
+    transition: none;
+  }
+}
+
+@media (max-width: 860px) {
+  :root {
+    --nav-h: 58px;
+  }
+
+  .site-nav::before {
+    height: 86px;
+  }
+
+  .site-nav-track {
+    padding: 9px 14px;
+    gap: 12px;
+  }
+
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+    border-radius: 5px;
+  }
+
+  .brand-text {
+    display: none;
+  }
+
+  .nav-links {
+    gap: clamp(12px, 3.2vw, 18px);
+  }
+
+  .nav-links a {
+    font-size: 11px;
+    letter-spacing: .04em;
+  }
+
+  .nav-cta {
+    min-width: 84px;
+    min-height: 31px;
+    padding-inline: 12px;
+    letter-spacing: .04em;
+  }
+}
+
+@media (max-width: 520px) {
+  .site-nav-track {
+    gap: 8px;
+  }
+
+  .nav-links {
+    gap: 10px;
+  }
+
+  .nav-links a[href="#education"] {
+    display: none;
+  }
+}
