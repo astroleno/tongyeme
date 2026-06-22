@@ -4,6 +4,7 @@
 @import url("../crane.css");
 @import url("../ph.css");
 @import url("../ttg.css");
+@import url("./homepage-continuity-fixes.css");
 
 .homepage-transition {
   --transition-seam-bleed: 2px;
