@@ -5,3 +5,10 @@ output/
 .review-*.png
 .vercel
 .omx/
+.worktrees/
+tmp/
+assets/*.backup-*
+assets/*.pre-*
+assets/*.bad-*
+assets/*.tmp.*
+assets/*.original.*

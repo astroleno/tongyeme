@@ -1,0 +1,312 @@
+.ttg-page {
+  --ttg-progress: 0;
+  --ttg-scroll-vh: 140;
+  --ttg-scene-width: max(100vw, 178dvh, 1180px);
+  --ttg-bg-width: max(100vw, 184dvh, 1180px);
+  --ttg-front-width: 100vw;
+  --ttg-front-overlay-opacity: 0.2;
+  min-height: 100%;
+  color: #f0dfbf;
+  color-scheme: dark;
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(176, 118, 46, 0.18), transparent 34rem),
+    radial-gradient(ellipse at 18% 70%, rgba(48, 83, 82, 0.16), transparent 28rem),
+    linear-gradient(180deg, #111817 0%, #080d10 58%, #040506 100%);
+}
+
+.ttg-route {
+  position: relative;
+  min-height: 100dvh;
+}
+
+.ttg-scroll {
+  position: relative;
+  height: calc(var(--ttg-scroll-vh) * 1dvh);
+  min-height: 0;
+}
+
+.ttg-sticky {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  min-height: 620px;
+  overflow: hidden;
+  isolation: isolate;
+  background: #080d10;
+}
+
+.ttg-field,
+.ttg-paper,
+.ttg-layer-stack,
+.ttg-moon-wash,
+.ttg-vignette {
+  position: absolute;
+  inset: 0;
+}
+
+.ttg-field {
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(ellipse at 53% 38%, rgba(207, 165, 86, 0.16), transparent 35%),
+    radial-gradient(ellipse at 50% 50%, rgba(29, 82, 92, 0.16), transparent 54%),
+    linear-gradient(180deg, #101919 0%, #090e11 58%, #040506 100%);
+}
+
+.ttg-paper {
+  z-index: 0;
+  opacity: 0.42;
+  background:
+    radial-gradient(circle at 22% 18%, rgba(255, 228, 162, 0.13) 0 1px, transparent 1.4px),
+    radial-gradient(circle at 76% 66%, rgba(0, 0, 0, 0.34) 0 0.9px, transparent 1.5px),
+    repeating-linear-gradient(96deg, rgba(255, 214, 138, 0.032) 0 1px, transparent 1px 9px),
+    linear-gradient(180deg, rgba(255, 226, 152, 0.08), rgba(0, 0, 0, 0.24));
+  background-size: 21px 21px, 27px 27px, 100% 100%, 100% 100%;
+}
+
+.ttg-layer-stack {
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ttg-backdrop-wash {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 1;
+  background:
+    linear-gradient(
+      0deg,
+      rgba(255, 236, 190, 0.02) 0%,
+      rgba(255, 236, 190, 0.08) 32%,
+      rgba(255, 242, 207, 0.22) 62%,
+      rgba(255, 252, 235, 0.48) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 245, 0.18) 0%,
+      transparent 30%,
+      transparent 100%
+    ),
+    radial-gradient(ellipse at 48% 34%, rgba(255, 236, 182, 0.22), transparent 50%);
+}
+
+.ttg-layer {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  width: var(--ttg-scene-width);
+  height: auto;
+  max-width: none;
+  user-select: none;
+  pointer-events: none;
+  transform: translate3d(-50%, -50%, 0);
+  transform-origin: 50% 50%;
+  will-change: transform;
+  backface-visibility: hidden;
+  contain: paint;
+}
+
+.ttg-layer--bg {
+  z-index: 1;
+  top: 0;
+  width: var(--ttg-bg-width);
+  opacity: 1;
+  transform: translate3d(-50%, 0, 0);
+  transform-origin: 50% 0;
+}
+
+.ttg-layer--middle {
+  z-index: 2;
+  opacity: 1;
+}
+
+.ttg-layer--middle-overlay {
+  z-index: 2;
+  opacity: 0.2;
+}
+
+.ttg-layer--front,
+.ttg-layer--front-overlay {
+  top: 100%;
+  width: var(--ttg-front-width);
+  height: auto;
+  transform: translate3d(-50%, -100%, 0);
+  transform-origin: 50% 100%;
+}
+
+.ttg-layer--front {
+  z-index: 3;
+  opacity: 1;
+}
+
+.ttg-layer--front-overlay {
+  z-index: 3;
+  opacity: var(--ttg-front-overlay-opacity);
+}
+
+.ttg-layer--figure {
+  --ttg-figure-layer-height: min(144dvh, 1460px);
+  z-index: 4;
+  top: 50%;
+  display: block;
+  width: calc(var(--ttg-figure-layer-height) * 0.5625);
+  height: var(--ttg-figure-layer-height);
+  max-width: none;
+  opacity: 0;
+  object-fit: contain;
+  object-position: center center;
+  clip-path: inset(1px);
+}
+
+.ttg-layer--figure.is-active {
+  opacity: 1;
+}
+
+.ttg-moon-wash {
+  z-index: 5;
+  opacity: 0.18;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(ellipse at 51% 36%, rgba(239, 202, 126, 0.30), transparent 25%),
+    radial-gradient(ellipse at 50% 58%, rgba(47, 121, 127, 0.16), transparent 45%);
+  filter: blur(16px);
+}
+
+.ttg-vignette {
+  z-index: 6;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.42) 0%, transparent 17%, transparent 83%, rgba(0, 0, 0, 0.42) 100%),
+    radial-gradient(ellipse at 50% 50%, transparent 0 58%, rgba(0, 0, 0, 0.26) 84%, rgba(0, 0, 0, 0.52) 100%),
+    linear-gradient(180deg, rgba(255, 220, 143, 0.04) 0%, transparent 42%, rgba(0, 0, 0, 0.45) 100%);
+}
+
+.ttg-progress {
+  display: none;
+  position: absolute;
+  z-index: 30;
+  left: max(22px, 5vw);
+  right: max(22px, 5vw);
+  bottom: 30px;
+  height: 1px;
+  overflow: hidden;
+  background: rgba(244, 213, 142, 0.16);
+}
+
+.ttg-progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #305c65, #d0a04c, #9c5637);
+  transform: scaleX(var(--ttg-progress));
+  transform-origin: 0 50%;
+}
+
+.ttg-tune-panel {
+  position: fixed;
+  z-index: 40;
+  right: 18px;
+  top: 18px;
+  width: min(250px, calc(100vw - 36px));
+  max-height: calc(100dvh - 36px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid rgba(82, 62, 37, 0.28);
+  border-radius: 8px;
+  background: rgba(247, 240, 222, 0.88);
+  box-shadow: 0 16px 38px rgba(10, 9, 7, 0.22);
+  color: #302416;
+  font: 12px/1.35 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  pointer-events: auto;
+  backdrop-filter: blur(14px);
+}
+
+.ttg-tune-panel__title {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ttg-tune-control {
+  display: grid;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.ttg-tune-control span {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: rgba(48, 36, 22, 0.84);
+}
+
+.ttg-tune-control output {
+  min-width: 54px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ttg-tune-control input {
+  width: 100%;
+  accent-color: #8c5c32;
+}
+
+.ttg-tune-reset {
+  width: 100%;
+  margin-top: 10px;
+  padding: 7px 8px;
+  border: 1px solid rgba(82, 62, 37, 0.20);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.42);
+  color: #302416;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ttg-tune-reset:hover {
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.ttg-noscript {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: var(--ttg-scene-width);
+  max-width: none;
+  transform: translate3d(-50%, -50%, 0);
+}
+
+.ttg-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 860px) {
+  .ttg-page {
+    --ttg-scene-width: max(142vw, 178dvh, 1180px);
+  }
+
+  .ttg-sticky {
+    min-height: 620px;
+  }
+}
+
+@media (max-width: 560px) {
+  .ttg-page {
+    --ttg-scroll-vh: 132;
+    --ttg-scene-width: max(236vw, 1040px);
+  }
+}
