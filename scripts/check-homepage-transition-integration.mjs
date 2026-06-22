@@ -7,6 +7,8 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relativePath) => readFileSync(path.join(rootDir, relativePath), 'utf8');
 
 const indexHtml = read('index.html');
+const mainSource = read('js/main.js');
+const continuityGuardSource = read('js/transitions/homepage-continuity-guard.js');
 const registrySource = read('js/transitions/homepage-transition-registry.js');
 const runtimeSource = read('js/transitions/homepage-transition-runtime.js');
 const aodHomepageAdapterSource = read('js/transitions/homepage/aod-homepage-adapter.js');
@@ -165,6 +167,22 @@ assert.ok(
     && runtimeSource.includes('FIXED_STAGE_CLASS')
     && runtimeSource.includes('SNAP_EXTRA_HEIGHT_VAR'),
   'Homepage runtime must support staged transition autoplay and snapped hold height'
+);
+assert.ok(
+  mainSource.includes("from './transitions/homepage-continuity-guard.js'")
+    && mainSource.includes('initHomepageContinuityGuard({'),
+  'Homepage bootstrap must install the continuity guard before transition controllers are created'
+);
+assert.ok(
+  continuityGuardSource.includes("'home-belief'")
+    && continuityGuardSource.includes('transitionPreserveEntry')
+    && continuityGuardSource.includes("'belief-method'")
+    && continuityGuardSource.includes('transitionInstantExit')
+    && continuityGuardSource.includes("'philosophy-contact'")
+    && continuityGuardSource.includes("'method-tooling__method-proof'")
+    && continuityGuardSource.includes('#brand .brand-definition-grid')
+    && continuityGuardSource.includes('#contact .contact-endpoint'),
+  'Homepage continuity guard must preserve the belief entry and skip detached gaps after AOD, Figure2, and crane'
 );
 assert.ok(
   runtimeSource.includes('shouldContinueStagedForward')
