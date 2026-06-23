@@ -1,4 +1,5 @@
 import { createFigure2TransitionController } from '../../components/figure2-transition.js';
+import { createHandoffReceiver } from './handoff-receiver.js';
 
 const FIGURE2_PAPER_GROUND = '#ece8dc';
 const FIGURE2_PAPER_GROUND_SOFT = '#f6f2e8';
@@ -80,24 +81,32 @@ function createProofScrollOverlay(host) {
 
   const overlay = host.ownerDocument.createElement('div');
   overlay.className = 'figure2-proof-scroll';
+  overlay.dataset.transitionGhost = 'method-proof-bridge';
   overlay.setAttribute('aria-hidden', 'true');
 
-  const content = sourceProof.cloneNode(true);
-  content.classList.add('figure2-proof-scroll__content');
-  content.classList.remove('quiet-proof', 'quiet-proof--source');
-  content.removeAttribute('aria-label');
-  overlay.append(content);
+  const marker = host.ownerDocument.createComment('method proof overlay marker');
+  const originalParent = sourceProof.parentNode;
+  const originalNextSibling = sourceProof.nextSibling;
+  const originalClass = sourceProof.getAttribute('class');
+  const originalAriaLabel = sourceProof.getAttribute('aria-label');
+
+  originalParent.insertBefore(marker, sourceProof);
+  sourceProof.classList.add('figure2-proof-scroll__content');
+  sourceProof.classList.remove('quiet-proof', 'quiet-proof--source');
+  sourceProof.removeAttribute('aria-label');
+  overlay.append(sourceProof);
   field.append(overlay);
 
   let disposed = false;
   const maxScroll = () => Math.max(160, Math.min(520, (window.innerHeight || 1) * 0.42));
 
   return {
-    update({ transitionProgress = 0, postProgress = 0 } = {}) {
+    update({ transitionProgress = 0, postProgress = 0, handoffProgress = 0 } = {}) {
       if (disposed) return 0;
       const transitionRevealProgress = smoothStep(range01(transitionProgress, 0.10, 0.94));
       const revealProgress = clamp(Math.max(transitionRevealProgress, postProgress > 0 ? 1 : 0));
-      const opacity = smoothStep(range01(revealProgress, 0.015, 0.16));
+      const handoffFade = 1 - smoothStep(range01(handoffProgress, 0.58, 0.90));
+      const opacity = smoothStep(range01(revealProgress, 0.015, 0.16)) * handoffFade;
       const scrollY = -maxScroll() * clamp(postProgress);
       overlay.style.setProperty('--figure2-proof-reveal-stop', `${(-12 + revealProgress * 122).toFixed(2)}%`);
       overlay.style.setProperty('--figure2-proof-reveal-edge', `${(2 + revealProgress * 132).toFixed(2)}%`);
@@ -106,7 +115,26 @@ function createProofScrollOverlay(host) {
       return revealProgress;
     },
     destroy() {
+      if (disposed) return;
       disposed = true;
+      if (marker.parentNode) {
+        marker.parentNode.insertBefore(sourceProof, marker);
+        marker.remove();
+      } else if (originalNextSibling?.parentNode === originalParent) {
+        originalParent.insertBefore(sourceProof, originalNextSibling);
+      } else {
+        originalParent.append(sourceProof);
+      }
+      if (originalClass === null) {
+        sourceProof.removeAttribute('class');
+      } else {
+        sourceProof.setAttribute('class', originalClass);
+      }
+      if (originalAriaLabel === null) {
+        sourceProof.removeAttribute('aria-label');
+      } else {
+        sourceProof.setAttribute('aria-label', originalAriaLabel);
+      }
       overlay.remove();
     }
   };
@@ -117,6 +145,8 @@ export function mountHomepageTransition({
   reduceMotion = false,
   progressSource,
   postProgressSource,
+  handoffTarget,
+  handoffProgressSource,
   addCleanup
 }) {
   host.classList.add('homepage-transition', 'homepage-transition--figure2', 'figure2-alpha-video');
@@ -171,8 +201,15 @@ export function mountHomepageTransition({
   `;
 
   const section = host.querySelector('[data-figure2-transition]');
+  const field = host.querySelector('.figure2-field');
   const proofSceneTexture = createProofSceneTexture(host);
   const proofScrollOverlay = createProofScrollOverlay(host);
+  const brandReceiver = createHandoffReceiver({
+    container: field,
+    target: handoffTarget,
+    sourceSelector: '.brand-definition-grid',
+    className: 'homepage-handoff-receiver--brand'
+  });
   const controller = createFigure2TransitionController(section, {
     root: host,
     body: host,
@@ -195,7 +232,9 @@ export function mountHomepageTransition({
       : transitionProgress >= 0.998
         ? postProgressSource?.() ?? 0
         : 0;
-    proofScrollOverlay?.update({ transitionProgress, postProgress });
+    const handoffProgress = reduceMotion ? 1 : handoffProgressSource?.() ?? postProgress;
+    proofScrollOverlay?.update({ transitionProgress, postProgress, handoffProgress });
+    brandReceiver?.update(Math.max(postProgress, handoffProgress), { start: 0.58, end: 0.96, liftPx: 22 });
     proofSceneTexture?.update();
 
     if (reduceMotion) {
@@ -234,6 +273,7 @@ export function mountHomepageTransition({
     controller.destroy();
     proofSceneTexture?.destroy();
     proofScrollOverlay?.destroy();
+    brandReceiver?.destroy();
     host.replaceChildren();
     host.classList.remove('homepage-transition', 'homepage-transition--figure2', 'figure2-alpha-video', 'figure2-multiply-video');
   };

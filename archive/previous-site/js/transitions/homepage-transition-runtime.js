@@ -1,4 +1,5 @@
 import { homepageTransitionRegistry } from './homepage-transition-registry.js';
+import { createSectionPresentationController } from './homepage/section-presentation-controller.js';
 
 const NAMED_TRANSITION_SELECTOR = [
   '.chapter-transition[data-transition-module]',
@@ -7,10 +8,9 @@ const NAMED_TRANSITION_SELECTOR = [
 
 const SOFT_MODULES = new Set(['soft-divider', 'soft-drilldown', 'soft-breath']);
 const SCROLL_DRIVEN_MODULES = new Set([]);
-const SNAP_SELECTOR = [
-  '.chapter-transition[data-transition-module]',
-  '.scene-transition[data-transition-module]'
-].join(',');
+const HANDOFF_AFTER_PLAYBACK = 'after-playback';
+const HANDOFF_POST_SCROLL = 'post-scroll';
+const REDUCED_MOTION_CLASS = 'homepage-transition--reduced-motion';
 
 const DEFAULT_PLAY_MS = 1900;
 const SNAP_VIEWPORT_HEIGHT_VAR = '--homepage-transition-snap-height';
@@ -18,6 +18,7 @@ const SNAP_EXTRA_HEIGHT_VAR = '--homepage-transition-extra-snap-height';
 const FIXED_STAGE_CLASS = 'homepage-transition--fixed-stage';
 const DEFAULT_SNAP_ENTRY_VH = 1.02;
 const POST_SNAP_INPUT_LOCK_MS = 420;
+const DIRECT_HASH_ALIGNMENT_DELAYS = [0, 120, 420, 1100, 2400, 5200, 9200];
 const BLOCKED_SCROLL_KEYS = new Set(['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' ']);
 const MODULE_PLAY_MS = {
   aod: 1800,
@@ -42,6 +43,45 @@ const parseNumberList = (value, { min = -Infinity, max = Infinity } = {}) => Str
   .split(',')
   .map((item) => Number(item.trim()))
   .filter((number) => Number.isFinite(number) && number > min && number < max);
+
+function resolveHandoffTarget(root, host) {
+  const selector = host?.dataset?.transitionHandoffTarget;
+  const queryRoot = typeof root?.querySelector === 'function' ? root : document;
+  if (selector) {
+    try {
+      const target = queryRoot.querySelector(selector);
+      if (target) return target;
+    } catch (error) {
+      console.warn(`Invalid transition handoff selector: ${selector}`, error);
+    }
+  }
+
+  const transitionTo = host?.dataset?.transitionTo;
+  if (!transitionTo) return null;
+  return queryRoot.getElementById?.(transitionTo) || null;
+}
+
+function getDirectHashTargetId() {
+  const hash = window.location.hash || '';
+  if (!hash.startsWith('#')) return '';
+  try {
+    return decodeURIComponent(hash.slice(1));
+  } catch {
+    return hash.slice(1);
+  }
+}
+
+function isDirectHashTargetForController(controller) {
+  const directHashTargetId = getDirectHashTargetId();
+  return Boolean(
+    directHashTargetId
+    && controller?.handoffTarget
+    && (
+      controller.handoffTarget.id === directHashTargetId
+      || controller.handoffTarget.dataset?.sectionId === directHashTargetId
+    )
+  );
+}
 
 function createCleanupStack() {
   const cleanups = [];
@@ -161,6 +201,7 @@ function createHomepageSnapCoordinator({
 } = {}) {
   const lenis = getScrollRuntimeLenis(scrollRuntime);
   const nativeTween = createNativeScrollTween();
+  const presentationController = createSectionPresentationController({ root });
   const originalLenisScrollTo = lenis?.scrollTo || null;
   const controllers = [];
   let activeController = null;
@@ -202,8 +243,29 @@ function createHomepageSnapCoordinator({
     Math.max(0, viewportHeight * ((controller?.postScrollVh || 0) / 100))
   );
 
+  const getHandoffTargetY = (controller) => (
+    controller?.handoffTarget ? Math.max(0, Math.round(getDocumentTop(controller.handoffTarget))) : null
+  );
+
+  const getDirectHashTargetY = (controller) => (
+    controller?.handoffTarget
+      ? Math.max(0, Math.round(getDocumentTop(controller.handoffTarget) - window.innerHeight * 0.2))
+      : null
+  );
+
+  const isDirectHashTargetVisible = (controller) => {
+    if (!controller?.handoffTarget) return true;
+    const rect = controller.handoffTarget.getBoundingClientRect();
+    const viewportHeight = Math.max(1, window.innerHeight || 1);
+    return rect.bottom > viewportHeight * 0.18 && rect.top < viewportHeight * 0.88;
+  };
+
   const syncFixedStageState = (controller, scrollY = getScrollY()) => {
     if (!controller?.host || controller.destroyed) return;
+    if (controller.skipForDirectHash && isDirectHashTargetForController(controller)) {
+      controller.host.classList.remove(FIXED_STAGE_CLASS);
+      return;
+    }
     const viewportHeight = Math.max(1, window.innerHeight || 1);
     const hostTop = getDocumentTop(controller.host);
     const stageHoldPx = getStageHoldPx(controller, viewportHeight);
@@ -379,30 +441,113 @@ function createHomepageSnapCoordinator({
     }, POST_SNAP_INPUT_LOCK_MS);
   };
 
+  const notifyHandoffComplete = (controller) => {
+    if (!controller?.handoffTarget) return;
+    presentationController.completeHandoff({
+      id: controller.handoffId || controller.host?.dataset?.transitionId || '',
+      to: controller.handoffTarget?.dataset?.sectionId || controller.handoffTarget?.id || '',
+      target: controller.handoffTarget,
+      suppressEntryOnce: controller.host?.dataset?.targetEntrySuppressOnce !== 'false'
+    });
+  };
+
+  const clearDirectHashAlignmentTimers = (controller) => {
+    controller?.directHashAlignmentTimers?.forEach((timer) => window.clearTimeout(timer));
+    if (controller) controller.directHashAlignmentTimers = [];
+  };
+
+  const alignDirectHashTarget = (controller) => {
+    if (
+      !controller?.skipForDirectHash
+      || controller.destroyed
+      || !isDirectHashTargetForController(controller)
+      || isDirectHashTargetVisible(controller)
+    ) return;
+
+    const targetY = getDirectHashTargetY(controller);
+    if (!Number.isFinite(targetY)) return;
+    scrollToY(targetY, {
+      immediate: true,
+      duration: 0
+    });
+  };
+
+  const completeDirectHashHandoff = (controller) => {
+    if (!controller?.handoffTarget || !isDirectHashTargetForController(controller)) return;
+
+    controller.handoffComplete = true;
+    controller.playedForward = true;
+    controller.host.classList.remove(FIXED_STAGE_CLASS);
+    if (!controller.directHashHandoffComplete) {
+      notifyHandoffComplete(controller);
+      controller.directHashHandoffComplete = true;
+    }
+
+    clearDirectHashAlignmentTimers(controller);
+    controller.directHashAlignmentTimers = DIRECT_HASH_ALIGNMENT_DELAYS.map((delay) => (
+      window.setTimeout(() => alignDirectHashTarget(controller), delay)
+    ));
+  };
+
   const completePlayback = (controller, direction, { hold = false } = {}) => {
     syncSnapViewportHeight();
     const hostTop = getSnapDocumentTop(controller.host);
     const viewportHeight = Math.max(1, window.innerHeight || 1);
     const shouldEnterPostScroll = !hold && direction > 0 && controller.postScrollVh > 0 && controller.playhead >= 0.998;
     const shouldInstantExit = !hold && direction > 0 && controller.instantExit && controller.playhead >= 0.998;
+    const shouldHandoffAfterPlayback = !hold
+      && direction > 0
+      && controller.handoffPhase === HANDOFF_AFTER_PLAYBACK
+      && controller.handoffTarget
+      && controller.playhead >= 0.998;
     const exitY = direction > 0
       ? hostTop + controller.host.offsetHeight + 1
       : hostTop - viewportHeight + 1;
     const targetY = hold
       ? hostTop
-      : shouldEnterPostScroll
-        ? getScrollY()
-        : exitY;
+      : shouldHandoffAfterPlayback
+        ? getHandoffTargetY(controller)
+        : shouldEnterPostScroll
+          ? getScrollY()
+          : exitY;
 
     scrollToY(targetY, {
-      immediate: hold || shouldEnterPostScroll || shouldInstantExit,
-      duration: hold || shouldEnterPostScroll || shouldInstantExit ? 0 : 0.58,
+      immediate: hold || shouldEnterPostScroll || shouldInstantExit || shouldHandoffAfterPlayback,
+      duration: hold || shouldEnterPostScroll || shouldInstantExit || shouldHandoffAfterPlayback ? 0 : 0.58,
       onComplete: () => {
         if (hold && direction > 0) {
           controller.playedForward = false;
           controller.playedBackward = false;
         }
+        if (shouldHandoffAfterPlayback) {
+          controller.handoffComplete = true;
+          notifyHandoffComplete(controller);
+        }
         finishPlayback(controller);
+      }
+    });
+  };
+
+  const completePostScrollHandoff = (controller) => {
+    const targetY = getHandoffTargetY(controller);
+    if (!Number.isFinite(targetY)) return;
+
+    controller.handoffComplete = true;
+    notifyHandoffComplete(controller);
+    clearReleaseTimer();
+    inputLockUntil = performance.now() + POST_SNAP_INPUT_LOCK_MS;
+    lockScroll();
+    scrollToY(targetY, {
+      immediate: true,
+      duration: 0,
+      onComplete: () => {
+        controller.host.classList.remove(FIXED_STAGE_CLASS);
+        syncLastScrollY();
+        releaseTimer = window.setTimeout(() => {
+          releaseTimer = 0;
+          unlockScroll();
+          syncLastScrollY();
+        }, POST_SNAP_INPUT_LOCK_MS);
       }
     });
   };
@@ -414,6 +559,13 @@ function createHomepageSnapCoordinator({
     clearReleaseTimer();
     inputLockUntil = 0;
     activeController = controller;
+    if (direction > 0 && controller.handoffId && controller.handoffTarget) {
+      presentationController.beginHandoff({
+        id: controller.handoffId || controller.host?.dataset?.transitionId || '',
+        to: controller.handoffTarget?.dataset?.sectionId || controller.handoffTarget?.id || '',
+        target: controller.handoffTarget
+      });
+    }
     controller.host.classList.add('homepage-transition--snapped', 'homepage-transition--playing');
     controller.host.dataset.snapState = direction > 0 ? 'forward' : 'backward';
     const target = direction > 0 ? getForwardStageTarget(controller) : 0;
@@ -458,9 +610,15 @@ function createHomepageSnapCoordinator({
       : hostTop + hostHeight + viewportHeight * 0.18;
     const backwardExit = hostTop - viewportHeight * 0.58;
 
+    if (controller.skipForDirectHash && isDirectHashTargetForController(controller)) {
+      completeDirectHashHandoff(controller);
+      return;
+    }
+
     if (scrollY < backwardExit) {
       controller.playedForward = false;
       controller.playhead = 0;
+      controller.handoffComplete = false;
       controller.host.classList.remove(FIXED_STAGE_CLASS);
     }
 
@@ -486,6 +644,21 @@ function createHomepageSnapCoordinator({
     if (reduceMotion) return;
     const scrollY = getScrollY();
     controllers.forEach((controller) => syncFixedStageState(controller, scrollY));
+    controllers.forEach((controller) => {
+      if (
+        controller.destroyed
+        || controller.handoffComplete
+        || controller.handoffPhase !== HANDOFF_POST_SCROLL
+        || !controller.handoffTarget
+        || controller.playhead < 0.998
+        || controller.postScrollVh <= 0
+      ) return;
+
+      const direction = scrollY >= lastScrollY ? 1 : -1;
+      if (direction <= 0 || controller.postProgressSource() < 0.995) return;
+
+      completePostScrollHandoff(controller);
+    });
     if (shouldSuppressControllerUpdates()) {
       lastScrollY = scrollY;
       return;
@@ -512,6 +685,14 @@ function createHomepageSnapCoordinator({
   return {
     createController(host) {
       const moduleName = host.dataset.transitionModule;
+      const handoffTarget = resolveHandoffTarget(root, host);
+      const directHashTargetId = getDirectHashTargetId();
+      const isDirectHandoffTarget = Boolean(
+        directHashTargetId
+        && host.dataset.handoffId
+        && handoffTarget
+        && (handoffTarget.id === directHashTargetId || handoffTarget.dataset?.sectionId === directHashTargetId)
+      );
       const controller = {
         host,
         playhead: reduceMotion ? 1 : 0,
@@ -523,8 +704,18 @@ function createHomepageSnapCoordinator({
         snapEntryVh: parseFiniteNumber(host.dataset.transitionSnapEntryVh, DEFAULT_SNAP_ENTRY_VH),
         preserveEntry: host.dataset.transitionPreserveEntry === 'true',
         instantExit: host.dataset.transitionInstantExit === 'true',
+        handoffTarget,
+        handoffId: host.dataset.handoffId || '',
+        handoffOwner: host.dataset.handoffOwner || '',
+        handoffScrollTo: host.dataset.handoffScrollTo || '',
+        handoffTargetSelector: host.dataset.handoffTargetSelector || '',
+        handoffPhase: host.dataset.transitionHandoffPhase || '',
+        handoffComplete: isDirectHandoffTarget,
+        skipForDirectHash: isDirectHandoffTarget,
+        directHashHandoffComplete: false,
+        directHashAlignmentTimers: [],
         raf: 0,
-        playedForward: false,
+        playedForward: isDirectHandoffTarget,
         playedBackward: false,
         destroyed: false,
         progressSource() {
@@ -540,12 +731,14 @@ function createHomepageSnapCoordinator({
         },
         destroy() {
           this.destroyed = true;
+          clearDirectHashAlignmentTimers(this);
           this.host.classList.remove(FIXED_STAGE_CLASS);
           cancelAnimationFrame(this.raf);
         }
       };
       syncControllerSnapHold(controller);
       controllers.push(controller);
+      if (isDirectHandoffTarget) completeDirectHashHandoff(controller);
       return controller;
     },
     destroy() {
@@ -564,6 +757,7 @@ function createHomepageSnapCoordinator({
         rootElement?.style?.removeProperty(SNAP_VIEWPORT_HEIGHT_VAR);
       }
       if (lenis && originalLenisScrollTo) lenis.scrollTo = originalLenisScrollTo;
+      presentationController.clear();
       nativeTween.destroy();
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
@@ -596,6 +790,12 @@ export async function initHomepageTransitions({
     const moduleName = host.dataset.transitionModule;
     if (!moduleName || SOFT_MODULES.has(moduleName)) return;
 
+    if (reduceMotion) {
+      host.classList.add(REDUCED_MOTION_CLASS);
+      cleanup.add(() => host.classList.remove(REDUCED_MOTION_CLASS));
+      return;
+    }
+
     const loadAdapter = homepageTransitionRegistry[moduleName];
     if (!loadAdapter) {
       fallbackHost(host, new Error(`Unknown homepage transition module: ${moduleName}`));
@@ -603,13 +803,17 @@ export async function initHomepageTransitions({
     }
 
     try {
-      const isScrollDriven = SCROLL_DRIVEN_MODULES.has(moduleName);
+      const isScrollDriven = host.dataset.transitionDrive === 'scroll' || SCROLL_DRIVEN_MODULES.has(moduleName);
       const snapController = isScrollDriven ? null : snapCoordinator.createController(host);
       const progressSource = isScrollDriven
         ? (host.dataset.transitionId === 'home-belief'
           ? createHeroLinkedScrollProgressSource(host)
           : createElementScrollProgressSource(host))
         : () => snapController.progressSource();
+      const handoffTarget = resolveHandoffTarget(root, host);
+      const handoffProgressSource = snapController?.handoffPhase === HANDOFF_POST_SCROLL
+        ? snapController.postProgressSource.bind(snapController)
+        : progressSource;
       const adapterModule = await loadAdapter();
       const mount = adapterModule.mountHomepageTransition || adapterModule.mountPatternBloomTransition;
       if (typeof mount !== 'function') {
@@ -621,6 +825,8 @@ export async function initHomepageTransitions({
         reduceMotion,
         progressSource,
         postProgressSource: snapController?.postProgressSource?.bind(snapController),
+        handoffTarget,
+        handoffProgressSource,
         addCleanup: cleanup.add,
         gsap,
         ScrollTrigger

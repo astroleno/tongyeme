@@ -123,9 +123,12 @@ assert.doesNotMatch(
   'Pattern Bloom code and CSS must not keep deprecated Belief presentation copy surfaces'
 );
 assert.ok(
-  patternBloomAdapterSource.includes('textProgress: beliefSceneOpacity')
-    && patternBloomAdapterSource.includes('presentationTarget: beliefSection'),
-  'Pattern Bloom must hand off to the real Belief section'
+  patternBloomAdapterSource.includes('textProgress: beliefCopyProgress')
+    && patternBloomAdapterSource.includes('presentationTarget: beliefSection')
+    && patternBloomAdapterSource.includes('const SECOND_REVEAL_START = 0.58')
+    && patternBloomAdapterSource.includes('Math.max(0.92')
+    && patternBloomAdapterSource.includes('beliefPinned ? 0.18 : 1'),
+  'Pattern Bloom must hand off to the real Belief section before the visual cover fully exits'
 );
 assert.ok(
   patternBloomAdapterSource.includes('isDirectVisitToBelief')
@@ -250,6 +253,10 @@ assert.ok(
 assert.ok(
   revealSource.includes('export function setRevealPresentedWithin')
     && revealSource.includes('export function suppressRevealOnceWithin')
+    && revealSource.includes('export function holdRevealWithin')
+    && revealSource.includes('export function releaseRevealWithin')
+    && revealSource.includes('wasPresented')
+    && revealSource.includes('revealControls.delete')
     && revealSource.includes('data-entry-state')
     && revealSource.includes('data-entry-count'),
   'Reveal runtime must expose target presentation controls and entry counters'
@@ -266,6 +273,22 @@ assert.ok(
     && runtimeSource.includes('presentationController.completeHandoff')
     && runtimeSource.includes('presentationController.beginHandoff'),
   'Homepage runtime must notify the presentation controller during handoff lifecycle'
+);
+assert.ok(
+  runtimeSource.includes('beginTargetRevealGate')
+    && runtimeSource.includes('releaseTargetRevealGate')
+    && runtimeSource.includes('targetRevealHeld')
+    && runtimeSource.includes('DEFAULT_TARGET_GATE_RELEASE_PROGRESS')
+    && runtimeSource.includes('transitionTargetReleaseProgress')
+    && runtimeSource.includes('controller.playhead >= controller.targetRevealReleaseProgress')
+    && runtimeSource.includes('homepage-transition-target-gated')
+    && runtimeSource.includes('releaseTargetGate: !hold && direction > 0'),
+  'Homepage runtime must gate non-handoff target sections only until the visual bridge tail can reveal native copy'
+);
+assert.doesNotMatch(
+  runtimeSource,
+  /holdRevealWithin|releaseRevealWithin/,
+  'Homepage runtime must not pause or hide child reveal tweens while gating visual bridge targets'
 );
 assert.ok(
   runtimeSource.includes('controller.handoffId && controller.handoffTarget'),
@@ -347,8 +370,15 @@ assert.ok(
     && homepageContinuityCss.includes('--paper-ink: #252719')
     && homepageContinuityCss.includes('z-index: 22')
     && homepageContinuityCss.includes('height: 0 !important')
+    && homepageContinuityCss.includes('.canvas-section.homepage-transition-target-gated')
+    && homepageContinuityCss.includes('body.is-pattern-bloom-covering .hero-content')
+    && homepageContinuityCss.includes('.canvas-section--belief.is-pattern-bloom-pinned')
+    && homepageContinuityCss.includes('z-index: 95')
+    && homepageContinuityCss.includes('opacity: 1 !important')
+    && homepageContinuityCss.includes('background: transparent !important')
+    && homepageContinuityCss.includes('.belief-star-field.is-ready')
     && homepageContinuityCss.includes('.canvas-section--belief.is-pattern-bloom-pinned .belief-copy-wrap'),
-  'Homepage continuity CSS must define receiver layers, reduced-motion collapse, paper tokens, method-brand collapse, and pinned belief copy'
+  'Homepage continuity CSS must define receiver layers, reduced-motion collapse, paper tokens, method-brand collapse, target gates, and pinned belief copy'
 );
 assert.doesNotMatch(
   homepageContinuityCss,

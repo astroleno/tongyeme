@@ -17,6 +17,7 @@ const SNAP_VIEWPORT_HEIGHT_VAR = '--homepage-transition-snap-height';
 const SNAP_EXTRA_HEIGHT_VAR = '--homepage-transition-extra-snap-height';
 const FIXED_STAGE_CLASS = 'homepage-transition--fixed-stage';
 const DEFAULT_SNAP_ENTRY_VH = 1.02;
+const DEFAULT_TARGET_GATE_RELEASE_PROGRESS = 0.86;
 const POST_SNAP_INPUT_LOCK_MS = 420;
 const DIRECT_HASH_ALIGNMENT_DELAYS = [0, 120, 420, 1100, 2400, 5200, 9200];
 const BLOCKED_SCROLL_KEYS = new Set(['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' ']);
@@ -80,6 +81,14 @@ function isDirectHashTargetForController(controller) {
       controller.handoffTarget.id === directHashTargetId
       || controller.handoffTarget.dataset?.sectionId === directHashTargetId
     )
+  );
+}
+
+function shouldGateTargetReveal(controller) {
+  return Boolean(
+    controller?.handoffTarget
+    && !controller.handoffId
+    && !controller.handoffPhase
   );
 }
 
@@ -411,6 +420,13 @@ function createHomepageSnapCoordinator({
       if (controller.destroyed) return;
       const progress = clamp((now - startTime) / durationMs);
       controller.playhead = from + (to - from) * easeInOutCubic(progress);
+      if (
+        direction > 0
+        && controller.targetRevealHeld
+        && controller.playhead >= controller.targetRevealReleaseProgress
+      ) {
+        releaseTargetRevealGate(controller);
+      }
 
       if (progress < 1) {
         controller.raf = requestAnimationFrame(tick);
@@ -426,9 +442,25 @@ function createHomepageSnapCoordinator({
     controller.raf = requestAnimationFrame(tick);
   };
 
-  const finishPlayback = (controller) => {
+  const beginTargetRevealGate = (controller) => {
+    if (!shouldGateTargetReveal(controller) || controller.targetRevealHeld) return;
+    controller.handoffTarget.setAttribute('data-section-transition-state', 'gated-in');
+    controller.handoffTarget.classList.add('homepage-transition-target-gated');
+    controller.targetRevealHeld = true;
+  };
+
+  const releaseTargetRevealGate = (controller) => {
+    if (!controller?.targetRevealHeld) return;
+    controller.targetRevealHeld = false;
+    controller.handoffTarget?.removeAttribute('data-section-transition-state');
+    controller.handoffTarget?.classList.remove('homepage-transition-target-gated');
+    window.requestAnimationFrame?.(() => window.ScrollTrigger?.refresh?.());
+  };
+
+  const finishPlayback = (controller, { releaseTargetGate = true } = {}) => {
     controller.host.classList.remove('homepage-transition--snapped', 'homepage-transition--playing');
     syncFixedStageState(controller);
+    if (releaseTargetGate) releaseTargetRevealGate(controller);
     inputLockUntil = performance.now() + POST_SNAP_INPUT_LOCK_MS;
     syncLastScrollY();
     clearReleaseTimer();
@@ -523,7 +555,7 @@ function createHomepageSnapCoordinator({
           controller.handoffComplete = true;
           notifyHandoffComplete(controller);
         }
-        finishPlayback(controller);
+        finishPlayback(controller, { releaseTargetGate: !hold && direction > 0 });
       }
     });
   };
@@ -565,6 +597,11 @@ function createHomepageSnapCoordinator({
         to: controller.handoffTarget?.dataset?.sectionId || controller.handoffTarget?.id || '',
         target: controller.handoffTarget
       });
+    }
+    if (direction > 0) {
+      beginTargetRevealGate(controller);
+    } else {
+      releaseTargetRevealGate(controller);
     }
     controller.host.classList.add('homepage-transition--snapped', 'homepage-transition--playing');
     controller.host.dataset.snapState = direction > 0 ? 'forward' : 'backward';
@@ -620,6 +657,7 @@ function createHomepageSnapCoordinator({
       controller.playhead = 0;
       controller.handoffComplete = false;
       controller.host.classList.remove(FIXED_STAGE_CLASS);
+      releaseTargetRevealGate(controller);
     }
 
     if (scrollY > hostTop + hostHeight + viewportHeight * 0.58) {
@@ -714,6 +752,12 @@ function createHomepageSnapCoordinator({
         skipForDirectHash: isDirectHandoffTarget,
         directHashHandoffComplete: false,
         directHashAlignmentTimers: [],
+        targetRevealHeld: false,
+        targetRevealReleaseProgress: clamp(
+          parseFiniteNumber(host.dataset.transitionTargetReleaseProgress, DEFAULT_TARGET_GATE_RELEASE_PROGRESS),
+          0,
+          1
+        ),
         raf: 0,
         playedForward: isDirectHandoffTarget,
         playedBackward: false,
@@ -732,6 +776,7 @@ function createHomepageSnapCoordinator({
         destroy() {
           this.destroyed = true;
           clearDirectHashAlignmentTimers(this);
+          releaseTargetRevealGate(this);
           this.host.classList.remove(FIXED_STAGE_CLASS);
           cancelAnimationFrame(this.raf);
         }

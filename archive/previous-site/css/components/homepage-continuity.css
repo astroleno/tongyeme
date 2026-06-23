@@ -132,41 +132,10 @@
   pointer-events: none;
 }
 
-.canvas-section.homepage-transition-target-gated,
-.canvas-section[data-section-transition-state="gated-in"] {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-
 .canvas-section--belief {
   height: 124svh;
   min-height: 124svh;
   overflow: visible;
-}
-
-.canvas-section--belief.is-pattern-bloom-pinned {
-  z-index: 95;
-  opacity: 1 !important;
-  background: transparent !important;
-}
-
-.canvas-section--belief.is-pattern-bloom-pinned .belief-star-field.is-ready {
-  opacity: calc(var(--belief-transition-opacity, 0) * .88) !important;
-}
-
-.canvas-section--belief.is-pattern-bloom-pinned .belief-star-wash,
-.canvas-section--belief.is-pattern-bloom-pinned::after {
-  opacity: var(--belief-transition-opacity, 0) !important;
-}
-
-body.is-pattern-bloom-covering .hero-sticky,
-body.is-pattern-bloom-covering .hero-content,
-body.is-pattern-bloom-covering .fallback-middle,
-body.is-pattern-bloom-covering .fallback-middle-near-blur,
-body.is-pattern-bloom-covering .fallback-figure {
-  opacity: 0 !important;
-  visibility: hidden !important;
 }
 
 .canvas-section--belief .belief-copy-wrap {
