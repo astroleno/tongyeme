@@ -7,16 +7,26 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relativePath) => readFileSync(path.join(rootDir, relativePath), 'utf8');
 
 const indexHtml = read('index.html');
-const mainSource = read('js/main.js');
-const continuityGuardSource = read('js/transitions/homepage-continuity-guard.js');
 const registrySource = read('js/transitions/homepage-transition-registry.js');
 const runtimeSource = read('js/transitions/homepage-transition-runtime.js');
+const revealSource = read('js/ui/reveal.js');
+const presentationControllerSource = read('js/transitions/homepage/section-presentation-controller.js');
+const handoffPreviewSource = read('js/transitions/homepage/handoff-preview.js');
+const handoffReceiverSource = read('js/transitions/homepage/handoff-receiver.js');
+const patternBloomAdapterSource = read('js/transitions/pattern-bloom-adapter.js');
 const aodHomepageAdapterSource = read('js/transitions/homepage/aod-homepage-adapter.js');
 const figure2HomepageAdapterSource = read('js/transitions/homepage/figure2-homepage-adapter.js');
+const figure3HomepageAdapterSource = read('js/transitions/homepage/figure3-homepage-adapter.js');
+const craneHomepageAdapterSource = read('js/transitions/homepage/crane-homepage-adapter.js');
 const ttgHomepageAdapterSource = read('js/transitions/homepage/ttg-homepage-adapter.js');
 const ttgComponentSource = read('js/components/ttg-transition.js');
 const figure2ComponentSource = read('js/components/figure2-transition.js');
+const figure3ComponentSource = read('js/components/figure3-transition.js');
+const stylesSource = read('css/styles.css');
 const homepageTransitionCss = read('css/components/homepage-transitions.css');
+const homepageContinuityCss = read('css/components/homepage-continuity.css');
+const canvasStageCss = read('css/sections/canvas-stage.css');
+const figure3Css = read('css/components/figure3-transition.css');
 const figure2Css = read('css/figure2.css');
 
 const namedModules = [
@@ -80,6 +90,11 @@ assert.equal(
   'ttg',
   'services-lab must use the TTG transition before the scenario scene'
 );
+assert.doesNotMatch(
+  `${figure3HomepageAdapterSource}\n${figure3ComponentSource}\n${figure3Css}`,
+  /SERVICE_TITLE|figure3-transition__service-copy|figure3-transition__service-|figure3-transition--service-visible|真正的 AI 转型/,
+  'Figure3 transition code and CSS must stay visual-only instead of keeping deprecated Services presentation copy surfaces'
+);
 assert.equal(
   transitionById.get('education-philosophy')?.attrs.get('data-transition-module'),
   'soft-breath',
@@ -96,6 +111,27 @@ for (const host of transitionHosts) {
 
 const figure2SceneTransition = transitionById.get('method-tooling__method-proof');
 const aodHandoffTransition = transitionById.get('belief-method');
+const craneHandoffTransition = transitionById.get('philosophy-contact');
+assert.equal(
+  transitionById.get('home-belief')?.attrs.get('data-transition-drive'),
+  'scroll',
+  'home-belief must be scroll-driven so it cannot expose an empty snap host'
+);
+assert.doesNotMatch(
+  `${patternBloomAdapterSource}\n${canvasStageCss}`,
+  /pattern-bloom-transition__copy|一句话讲清我们干什么|让 AI 从一场培训/,
+  'Pattern Bloom code and CSS must not keep deprecated Belief presentation copy surfaces'
+);
+assert.ok(
+  patternBloomAdapterSource.includes('textProgress: beliefSceneOpacity')
+    && patternBloomAdapterSource.includes('presentationTarget: beliefSection'),
+  'Pattern Bloom must hand off to the real Belief section'
+);
+assert.ok(
+  patternBloomAdapterSource.includes('isDirectVisitToBelief')
+    && patternBloomAdapterSource.includes('delete host.dataset.patternBloomMounted'),
+  'Pattern Bloom must not pin Belief copy on direct target hash visits'
+);
 assert.equal(
   aodHandoffTransition?.attrs.get('data-transition-stage-stops'),
   undefined,
@@ -111,12 +147,29 @@ assert.equal(
   undefined,
   'AOD handoff must not add a detached paper-only hold after normal playback'
 );
+assert.equal(
+  aodHandoffTransition?.attrs.get('data-transition-handoff-target'),
+  '#method',
+  'AOD handoff must declare the native Method section as its release target'
+);
+assert.equal(
+  aodHandoffTransition?.attrs.get('data-transition-handoff-phase'),
+  'after-playback',
+  'AOD handoff must release immediately after playback'
+);
 assert.ok(
   !aodHomepageAdapterSource.includes('aod-transition__method-copy')
     && !aodHomepageAdapterSource.includes('先看懂，')
     && !aodHomepageAdapterSource.includes('<strong>识场</strong>')
     && !aodHomepageAdapterSource.includes('AI 落地前两步'),
   'AOD handoff must not render a duplicate Method block inside the transition'
+);
+assert.ok(
+  aodHomepageAdapterSource.includes('createHandoffReceiver')
+    && aodHomepageAdapterSource.includes("sourceSelector: '.method-edition-layout--after-handoff'")
+    && aodHomepageAdapterSource.includes("className: 'homepage-handoff-receiver--method'")
+    && aodHomepageAdapterSource.includes('handoffProgressSource'),
+  'AOD handoff must adopt the native Method first screen'
 );
 assert.ok(
   indexHtml.includes('method-handoff-anchor')
@@ -158,31 +211,75 @@ assert.equal(
   '56',
   'Figure2 method proof transition must keep the snapped Figure2 stage for a single proof-copy scene'
 );
+assert.equal(
+  figure2SceneTransition?.attrs.get('data-transition-handoff-target'),
+  '#brand',
+  'Figure2 proof transition must declare the native Brand section as its release target'
+);
+assert.equal(
+  figure2SceneTransition?.attrs.get('data-transition-handoff-phase'),
+  'post-scroll',
+  'Figure2 proof transition must release only after its proof-copy post-scroll'
+);
+assert.equal(
+  craneHandoffTransition?.attrs.get('data-transition-handoff-target'),
+  '#contact',
+  'Crane transition must declare the native Contact section as its release target'
+);
+assert.equal(
+  craneHandoffTransition?.attrs.get('data-transition-handoff-phase'),
+  'after-playback',
+  'Crane transition must release immediately after playback'
+);
 assert.ok(
   runtimeSource.includes('transitionStageStops')
     && runtimeSource.includes('transitionStagePlayMs')
     && runtimeSource.includes('transitionStageHoldVh')
     && runtimeSource.includes('transitionPostScrollVh')
+    && runtimeSource.includes('transitionDrive')
+    && runtimeSource.includes('transitionHandoffTarget')
+    && runtimeSource.includes('transitionHandoffPhase')
+    && runtimeSource.includes('HANDOFF_POST_SCROLL')
+    && runtimeSource.includes('REDUCED_MOTION_CLASS')
+    && runtimeSource.includes('handoffProgressSource')
     && runtimeSource.includes('postProgressSource')
     && runtimeSource.includes('FIXED_STAGE_CLASS')
     && runtimeSource.includes('SNAP_EXTRA_HEIGHT_VAR'),
   'Homepage runtime must support staged transition autoplay and snapped hold height'
 );
 assert.ok(
-  mainSource.includes("from './transitions/homepage-continuity-guard.js'")
-    && mainSource.includes('initHomepageContinuityGuard({'),
-  'Homepage bootstrap must install the continuity guard before transition controllers are created'
+  revealSource.includes('export function setRevealPresentedWithin')
+    && revealSource.includes('export function suppressRevealOnceWithin')
+    && revealSource.includes('data-entry-state')
+    && revealSource.includes('data-entry-count'),
+  'Reveal runtime must expose target presentation controls and entry counters'
 );
 assert.ok(
-  continuityGuardSource.includes("'home-belief'")
-    && continuityGuardSource.includes('transitionPreserveEntry')
-    && continuityGuardSource.includes("'belief-method'")
-    && continuityGuardSource.includes('transitionInstantExit')
-    && continuityGuardSource.includes("'philosophy-contact'")
-    && continuityGuardSource.includes("'method-tooling__method-proof'")
-    && continuityGuardSource.includes('#brand .brand-definition-grid')
-    && continuityGuardSource.includes('#contact .contact-endpoint'),
-  'Homepage continuity guard must preserve the belief entry and skip detached gaps after AOD, Figure2, and crane'
+  presentationControllerSource.includes('createSectionPresentationController')
+    && presentationControllerSource.includes('markPresented')
+    && presentationControllerSource.includes('suppressEntryOnce')
+    && presentationControllerSource.includes('completeHandoff'),
+  'Homepage must have a section presentation controller'
+);
+assert.ok(
+  runtimeSource.includes("from './homepage/section-presentation-controller.js'")
+    && runtimeSource.includes('presentationController.completeHandoff')
+    && runtimeSource.includes('presentationController.beginHandoff'),
+  'Homepage runtime must notify the presentation controller during handoff lifecycle'
+);
+assert.ok(
+  runtimeSource.includes('controller.handoffId && controller.handoffTarget'),
+  'Homepage runtime must notify presentation state only for declared handoffs'
+);
+assert.ok(
+  runtimeSource.includes('getDirectHashTargetId')
+    && runtimeSource.includes('isDirectHandoffTarget')
+    && runtimeSource.includes('skipForDirectHash')
+    && runtimeSource.includes('completeDirectHashHandoff(controller)')
+    && runtimeSource.includes('directHashHandoffComplete')
+    && runtimeSource.includes('handoffComplete: isDirectHandoffTarget')
+    && runtimeSource.includes('playedForward: isDirectHandoffTarget'),
+  'Homepage runtime must skip preceding handoff playback and complete target presentation for direct target anchors'
 );
 assert.ok(
   runtimeSource.includes('shouldContinueStagedForward')
@@ -218,6 +315,51 @@ assert.ok(
     && homepageTransitionCss.includes('contain: none'),
   'Homepage Figure2 staged visuals must stay fixed to the viewport while snapped'
 );
+assert.ok(
+  handoffReceiverSource.includes('createHandoffReceiver')
+    && handoffPreviewSource.includes('createHandoffPreview')
+    && handoffReceiverSource.includes('data-handoff-receiver')
+    && handoffReceiverSource.includes('setRevealPresentedWithin')
+    && handoffReceiverSource.includes('restore()'),
+  'Shared handoff helper must adopt the real target DOM and restore it after release'
+);
+assert.match(
+  handoffReceiverSource,
+  /receiver\.remove\(\);\s*setRevealPresentedWithin\(source\);/,
+  'Shared handoff helper must re-present restored source after receiver removal'
+);
+assert.doesNotMatch(
+  `${handoffPreviewSource}\n${handoffReceiverSource}`,
+  /cloneNode\s*\(\s*true\s*\)/,
+  'Shared handoff helper must not clone target content'
+);
+assert.equal(
+  [...stylesSource.matchAll(/@import url\("([^"]+)"\);/g)].map((match) => match[1]).at(-1),
+  './components/homepage-continuity.css',
+  'Homepage continuity CSS must be the last top-level stylesheet import'
+);
+assert.ok(
+  homepageContinuityCss.includes('.homepage-handoff-receiver')
+    && homepageContinuityCss.includes('homepage-handoff-receiver--method')
+    && homepageContinuityCss.includes('homepage-handoff-receiver--brand')
+    && homepageContinuityCss.includes('homepage-handoff-receiver--contact')
+    && homepageContinuityCss.includes('homepage-transition--reduced-motion')
+    && homepageContinuityCss.includes('--paper-ink: #252719')
+    && homepageContinuityCss.includes('z-index: 22')
+    && homepageContinuityCss.includes('height: 0 !important')
+    && homepageContinuityCss.includes('.canvas-section--belief.is-pattern-bloom-pinned .belief-copy-wrap'),
+  'Homepage continuity CSS must define receiver layers, reduced-motion collapse, paper tokens, method-brand collapse, and pinned belief copy'
+);
+assert.doesNotMatch(
+  homepageContinuityCss,
+  /homepage-handoff-preview/,
+  'Homepage continuity CSS must not keep clone preview selectors'
+);
+assert.doesNotMatch(
+  homepageContinuityCss,
+  /\.long-canvas\s*>\s*\.canvas-section--belief/,
+  'Belief continuity overrides must target the actual belief section outside .long-canvas'
+);
 
 assert.ok(
   figure2HomepageAdapterSource.includes('startFigureVideoPlayback()')
@@ -249,9 +391,17 @@ assert.doesNotMatch(
 assert.ok(
   figure2HomepageAdapterSource.includes('createProofScrollOverlay')
     && figure2HomepageAdapterSource.includes('postProgressSource?.()')
+    && figure2HomepageAdapterSource.includes('handoffFade')
     && figure2HomepageAdapterSource.includes('transitionRevealProgress')
     && figure2HomepageAdapterSource.includes('--figure2-proof-reveal-stop'),
   'Figure2 proof copy must be owned by one DOM overlay that reveals during the second stage and keeps scrolling after it'
+);
+assert.ok(
+  figure2HomepageAdapterSource.includes('createHandoffReceiver')
+    && figure2HomepageAdapterSource.includes("sourceSelector: '.brand-definition-grid'")
+    && figure2HomepageAdapterSource.includes("className: 'homepage-handoff-receiver--brand'")
+    && figure2HomepageAdapterSource.includes('handoffProgressSource'),
+  'Figure2 homepage transition must adopt the native Brand grid during handoff'
 );
 assert.doesNotMatch(
   figure2HomepageAdapterSource,
@@ -286,10 +436,17 @@ assert.ok(
   'Figure2 method proof source must be hidden from normal flow so it cannot become a second visible scene'
 );
 assert.ok(
-  read('css/sections/source-copy.css').includes('.long-canvas .chapter-transition[data-transition-id="method-brand"]')
-    && read('css/sections/source-copy.css').includes('clamp(4svh, 6vw, 10svh)')
-    && read('css/sections/source-copy.css').includes('+ .canvas-section--brand'),
-  'Method-to-brand divider and brand top spacing must stay compact after the fixed proof scroll'
+  homepageContinuityCss.includes('.long-canvas > .chapter-transition[data-transition-id="method-brand"]')
+    && homepageContinuityCss.includes('height: 0 !important')
+    && homepageContinuityCss.includes('+ .canvas-section--brand'),
+  'Method-to-brand divider must collapse to zero in the homepage continuity path'
+);
+assert.ok(
+  craneHomepageAdapterSource.includes('createHandoffReceiver')
+    && craneHomepageAdapterSource.includes("sourceSelector: '.contact-endpoint'")
+    && craneHomepageAdapterSource.includes("className: 'homepage-handoff-receiver--contact'")
+    && craneHomepageAdapterSource.includes('handoffProgressSource'),
+  'Crane homepage transition must adopt the native Contact endpoint during handoff'
 );
 assert.doesNotMatch(
   `${figure2HomepageAdapterSource}\n${homepageTransitionCss}\n${figure2Css}`,

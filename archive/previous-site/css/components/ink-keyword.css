@@ -41,27 +41,23 @@
 }
 
 .ink-keyword--webgl {
-  display: inline-block;
-  position: relative;
+  display: inline-grid;
   vertical-align: baseline;
+}
+
+.ink-keyword__text,
+.ink-keyword__canvas {
+  grid-area: 1 / 1;
 }
 
 .ink-keyword__text {
   opacity: .82;
-  transition: opacity .45s ease;
-}
-
-.ink-keyword--webgl.is-ink-visible .ink-keyword__text {
-  opacity: 0;
 }
 
 .ink-keyword__canvas {
-  position: absolute;
-  left: -.14em;
-  top: -.18em;
   width: calc(100% + .28em);
   height: calc(100% + .36em);
-  margin: 0;
+  margin: -.18em -.14em;
   pointer-events: none;
   opacity: 0;
   visibility: hidden;

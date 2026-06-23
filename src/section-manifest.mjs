@@ -79,14 +79,17 @@ export const chapterTransitions = [
     from: 'home',
     to: 'belief',
     module: 'pattern-bloom',
-    variant: 'lotus-manifesto'
+    variant: 'lotus-manifesto',
+    drive: 'scroll'
   },
   {
     id: 'belief-method',
     from: 'belief',
     to: 'method-field-law',
     module: 'aod',
-    variant: 'measure-order'
+    variant: 'measure-order',
+    handoffTarget: '#method',
+    handoffPhase: 'after-playback'
   },
   {
     id: 'method-brand',
@@ -128,7 +131,151 @@ export const chapterTransitions = [
     from: 'philosophy',
     to: 'contact',
     module: 'crane',
-    variant: 'forward-motion'
+    variant: 'forward-motion',
+    handoffTarget: '#contact',
+    handoffPhase: 'after-playback'
+  }
+];
+
+export const sectionEntryPolicies = {
+  belief: {
+    directVisit: 'replay',
+    afterHandoff: 'continue'
+  },
+  method: {
+    directVisit: 'replay',
+    afterHandoff: 'skip'
+  },
+  brand: {
+    directVisit: 'replay',
+    afterHandoff: 'skip'
+  },
+  services: {
+    directVisit: 'replay',
+    afterHandoff: 'replay'
+  },
+  lab: {
+    directVisit: 'replay',
+    afterHandoff: 'replay'
+  },
+  education: {
+    directVisit: 'replay',
+    afterHandoff: 'replay'
+  },
+  philosophy: {
+    directVisit: 'replay',
+    afterHandoff: 'replay'
+  },
+  contact: {
+    directVisit: 'replay',
+    afterHandoff: 'skip'
+  }
+};
+
+export const handoffs = [
+  {
+    id: 'home-belief',
+    transitionId: 'home-belief',
+    from: 'home',
+    to: 'belief',
+    owner: 'target-section',
+    transition: {
+      mode: 'scroll-bridge',
+      ghostScenes: ['pattern-bloom-lotus'],
+      targetSelector: '.belief-copy-wrap'
+    },
+    targetEntry: {
+      policy: 'continue',
+      suppressOnceAfterHandoff: true,
+      directVisitPolicy: 'replay'
+    },
+    afterComplete: {
+      markTargetPresented: true,
+      scrollTo: '#belief',
+      snapToVisualStart: true,
+      cleanupGhosts: true
+    },
+    reducedMotion: {
+      policy: 'jump-to-presented'
+    }
+  },
+  {
+    id: 'belief-method',
+    transitionId: 'belief-method',
+    from: 'belief',
+    to: 'method',
+    owner: 'target-section',
+    transition: {
+      mode: 'after-playback',
+      ghostScenes: ['aod-field'],
+      targetSelector: '.method-edition-layout--after-handoff'
+    },
+    targetEntry: {
+      policy: 'skip',
+      suppressOnceAfterHandoff: true,
+      directVisitPolicy: 'replay'
+    },
+    afterComplete: {
+      markTargetPresented: true,
+      scrollTo: '#method',
+      snapToVisualStart: true,
+      cleanupGhosts: true
+    },
+    reducedMotion: {
+      policy: 'jump-to-presented'
+    }
+  },
+  {
+    id: 'method-proof-brand',
+    transitionId: 'method-tooling__method-proof',
+    from: 'method-proof',
+    to: 'brand',
+    owner: 'target-section',
+    transition: {
+      mode: 'post-scroll',
+      ghostScenes: ['method-proof-bridge'],
+      targetSelector: '.brand-definition-grid'
+    },
+    targetEntry: {
+      policy: 'skip',
+      suppressOnceAfterHandoff: true,
+      directVisitPolicy: 'replay'
+    },
+    afterComplete: {
+      markTargetPresented: true,
+      scrollTo: '#brand',
+      snapToVisualStart: true,
+      cleanupGhosts: true
+    },
+    reducedMotion: {
+      policy: 'jump-to-presented'
+    }
+  },
+  {
+    id: 'philosophy-contact',
+    transitionId: 'philosophy-contact',
+    from: 'philosophy',
+    to: 'contact',
+    owner: 'target-section',
+    transition: {
+      mode: 'after-playback',
+      ghostScenes: ['crane-motion'],
+      targetSelector: '.contact-endpoint'
+    },
+    targetEntry: {
+      policy: 'skip',
+      suppressOnceAfterHandoff: true,
+      directVisitPolicy: 'replay'
+    },
+    afterComplete: {
+      markTargetPresented: true,
+      scrollTo: '#contact',
+      snapToVisualStart: true,
+      cleanupGhosts: true
+    },
+    reducedMotion: {
+      policy: 'jump-to-presented'
+    }
   }
 ];
 

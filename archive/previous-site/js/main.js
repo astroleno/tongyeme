@@ -3,6 +3,7 @@ import { initLoaderInkReveal } from './effects/ink-text-reveal.js';
 import { createSiteRuntime } from './site/runtime.js';
 import { initBeliefStarField } from './sections/belief.js';
 import { initLayeredHero, initFallbackParallax } from './sections/hero.js';
+import { initHomepageContinuityGuard } from './transitions/homepage-continuity-guard.js';
 import { initHomepageTransitions } from './transitions/homepage-transition-runtime.js';
 import { initCursorGlow } from './ui/cursor-glow.js';
 import { initMagneticAndTilt } from './ui/magnetic-tilt.js';
@@ -10,8 +11,7 @@ import { initPageProgress } from './ui/page-progress.js';
 import { initGsapTextAndUI, initVanillaReveal } from './ui/reveal.js';
 import { initSmoothScroll } from './ui/smooth-scroll.js';
 
-const root = document.documentElement;
-const body = document.body;
+const root = document.documentElement, body = document.body;
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const CDN = {
   gsap: 'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js',
@@ -93,7 +93,7 @@ if (reduceMotion) {
   initMagneticAndTilt({ reduceMotion });
   initFallbackParallax({ root, reduceMotion, runtime });
   initVanillaReveal();
-  initHomepageTransitions({ root: document, reduceMotion: true });
+  initHomepageTransitions(initHomepageContinuityGuard({ root: document, reduceMotion: true }));
 } else {
   loadRequiredLibraries()
     .then(() => {
@@ -101,19 +101,19 @@ if (reduceMotion) {
       initMagneticAndTilt({ reduceMotion });
       initGsapTextAndUI({ root, scrollRuntime });
       initLayeredHero({ root, body, runtime, reduceMotion });
-      initHomepageTransitions({
+      initHomepageTransitions(initHomepageContinuityGuard({
         root: document,
         scrollRuntime,
         reduceMotion,
         gsap: window.gsap,
         ScrollTrigger: window.ScrollTrigger
-      });
+      }));
     })
     .catch((error) => {
       console.warn('CDN libraries unavailable, switching to fallback.', error);
       initMagneticAndTilt({ reduceMotion });
       initFallbackParallax({ root, reduceMotion, runtime });
       initVanillaReveal();
-      initHomepageTransitions({ root: document, reduceMotion: true });
+      initHomepageTransitions(initHomepageContinuityGuard({ root: document, reduceMotion: true }));
     });
 }
