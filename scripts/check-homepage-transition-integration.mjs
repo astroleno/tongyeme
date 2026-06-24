@@ -18,6 +18,7 @@ const aodHomepageAdapterSource = read('js/transitions/homepage/aod-homepage-adap
 const figure2HomepageAdapterSource = read('js/transitions/homepage/figure2-homepage-adapter.js');
 const figure3HomepageAdapterSource = read('js/transitions/homepage/figure3-homepage-adapter.js');
 const craneHomepageAdapterSource = read('js/transitions/homepage/crane-homepage-adapter.js');
+const phHomepageAdapterSource = read('js/transitions/homepage/ph-homepage-adapter.js');
 const ttgHomepageAdapterSource = read('js/transitions/homepage/ttg-homepage-adapter.js');
 const ttgComponentSource = read('js/components/ttg-transition.js');
 const figure2ComponentSource = read('js/components/figure2-transition.js');
@@ -95,6 +96,11 @@ assert.doesNotMatch(
   /SERVICE_TITLE|figure3-transition__service-copy|figure3-transition__service-|figure3-transition--service-visible|真正的 AI 转型/,
   'Figure3 transition code and CSS must stay visual-only instead of keeping deprecated Services presentation copy surfaces'
 );
+assert.ok(
+  figure3HomepageAdapterSource.includes('timeline?.update(progress')
+    && figure3HomepageAdapterSource.includes('playbackComplete'),
+  'Figure3 visual bridge must present Services through the homepage timeline'
+);
 assert.equal(
   transitionById.get('education-philosophy')?.attrs.get('data-transition-module'),
   'soft-breath',
@@ -125,10 +131,13 @@ assert.doesNotMatch(
 assert.ok(
   patternBloomAdapterSource.includes('textProgress: beliefCopyProgress')
     && patternBloomAdapterSource.includes('presentationTarget: beliefSection')
-    && patternBloomAdapterSource.includes('const SECOND_REVEAL_START = 0.58')
-    && patternBloomAdapterSource.includes('Math.max(0.92')
-    && patternBloomAdapterSource.includes('beliefPinned ? 0.18 : 1'),
-  'Pattern Bloom must hand off to the real Belief section before the visual cover fully exits'
+    && patternBloomAdapterSource.includes('const SECOND_REVEAL_START')
+    && patternBloomAdapterSource.includes('timeline?.update(progress')
+    && patternBloomAdapterSource.includes('lotusContracted')
+    && patternBloomAdapterSource.includes('targetReady')
+    && patternBloomAdapterSource.includes('beliefCopyComplete')
+    && !patternBloomAdapterSource.includes('beliefPinned ? 0.18 : 1'),
+  'Pattern Bloom must hand off through homepage timeline milestones instead of the old local opacity clamp'
 );
 assert.ok(
   patternBloomAdapterSource.includes('isDirectVisitToBelief')
@@ -168,11 +177,11 @@ assert.ok(
   'AOD handoff must not render a duplicate Method block inside the transition'
 );
 assert.ok(
-  aodHomepageAdapterSource.includes('createHandoffReceiver')
-    && aodHomepageAdapterSource.includes("sourceSelector: '.method-edition-layout--after-handoff'")
-    && aodHomepageAdapterSource.includes("className: 'homepage-handoff-receiver--method'")
+  !aodHomepageAdapterSource.includes('createHandoffReceiver')
+    && aodHomepageAdapterSource.includes('timeline?.update')
+    && aodHomepageAdapterSource.includes('playbackComplete')
     && aodHomepageAdapterSource.includes('handoffProgressSource'),
-  'AOD handoff must adopt the native Method first screen'
+  'AOD handoff must report timeline progress without adopting the native Method DOM'
 );
 assert.ok(
   indexHtml.includes('method-handoff-anchor')
@@ -251,7 +260,8 @@ assert.ok(
   'Homepage runtime must support staged transition autoplay and snapped hold height'
 );
 assert.ok(
-  revealSource.includes('export function setRevealPresentedWithin')
+  revealSource.includes('export function presentRevealWithin')
+    && revealSource.includes('export function setRevealPresentedWithin')
     && revealSource.includes('export function suppressRevealOnceWithin')
     && revealSource.includes('export function holdRevealWithin')
     && revealSource.includes('export function releaseRevealWithin')
@@ -341,15 +351,9 @@ assert.ok(
 assert.ok(
   handoffReceiverSource.includes('createHandoffReceiver')
     && handoffPreviewSource.includes('createHandoffPreview')
-    && handoffReceiverSource.includes('data-handoff-receiver')
-    && handoffReceiverSource.includes('setRevealPresentedWithin')
-    && handoffReceiverSource.includes('restore()'),
-  'Shared handoff helper must adopt the real target DOM and restore it after release'
-);
-assert.match(
-  handoffReceiverSource,
-  /receiver\.remove\(\);\s*setRevealPresentedWithin\(source\);/,
-  'Shared handoff helper must re-present restored source after receiver removal'
+    && handoffReceiverSource.includes('has been retired')
+    && handoffReceiverSource.includes('throw new Error'),
+  'Shared handoff helper must be retired loudly instead of adopting real target DOM'
 );
 assert.doesNotMatch(
   `${handoffPreviewSource}\n${handoffReceiverSource}`,
@@ -362,13 +366,8 @@ assert.equal(
   'Homepage continuity CSS must be the last top-level stylesheet import'
 );
 assert.ok(
-  homepageContinuityCss.includes('.homepage-handoff-receiver')
-    && homepageContinuityCss.includes('homepage-handoff-receiver--method')
-    && homepageContinuityCss.includes('homepage-handoff-receiver--brand')
-    && homepageContinuityCss.includes('homepage-handoff-receiver--contact')
-    && homepageContinuityCss.includes('homepage-transition--reduced-motion')
-    && homepageContinuityCss.includes('--paper-ink: #252719')
-    && homepageContinuityCss.includes('z-index: 22')
+  homepageContinuityCss.includes('homepage-transition--reduced-motion')
+    && homepageContinuityCss.includes('[data-entry-owner="timeline"][data-timeline-fixed="true"]')
     && homepageContinuityCss.includes('height: 0 !important')
     && homepageContinuityCss.includes('.canvas-section.homepage-transition-target-gated')
     && homepageContinuityCss.includes('body.is-pattern-bloom-covering .hero-content')
@@ -378,12 +377,17 @@ assert.ok(
     && homepageContinuityCss.includes('background: transparent !important')
     && homepageContinuityCss.includes('.belief-star-field.is-ready')
     && homepageContinuityCss.includes('.canvas-section--belief.is-pattern-bloom-pinned .belief-copy-wrap'),
-  'Homepage continuity CSS must define receiver layers, reduced-motion collapse, paper tokens, method-brand collapse, target gates, and pinned belief copy'
+  'Homepage continuity CSS must define reduced-motion collapse, timeline target copy, method-brand collapse, target gates, and pinned belief copy'
 );
 assert.doesNotMatch(
   homepageContinuityCss,
   /homepage-handoff-preview/,
   'Homepage continuity CSS must not keep clone preview selectors'
+);
+assert.doesNotMatch(
+  homepageContinuityCss,
+  /homepage-handoff-receiver/,
+  'Homepage continuity CSS must not keep retired handoff receiver selectors'
 );
 assert.doesNotMatch(
   homepageContinuityCss,
@@ -427,11 +431,11 @@ assert.ok(
   'Figure2 proof copy must be owned by one DOM overlay that reveals during the second stage and keeps scrolling after it'
 );
 assert.ok(
-  figure2HomepageAdapterSource.includes('createHandoffReceiver')
-    && figure2HomepageAdapterSource.includes("sourceSelector: '.brand-definition-grid'")
-    && figure2HomepageAdapterSource.includes("className: 'homepage-handoff-receiver--brand'")
+  !figure2HomepageAdapterSource.includes('createHandoffReceiver')
+    && figure2HomepageAdapterSource.includes('timeline?.update')
+    && figure2HomepageAdapterSource.includes('phaseTwoComplete')
     && figure2HomepageAdapterSource.includes('handoffProgressSource'),
-  'Figure2 homepage transition must adopt the native Brand grid during handoff'
+  'Figure2 homepage transition must report timeline progress without adopting the native Brand grid'
 );
 assert.doesNotMatch(
   figure2HomepageAdapterSource,
@@ -472,11 +476,11 @@ assert.ok(
   'Method-to-brand divider must collapse to zero in the homepage continuity path'
 );
 assert.ok(
-  craneHomepageAdapterSource.includes('createHandoffReceiver')
-    && craneHomepageAdapterSource.includes("sourceSelector: '.contact-endpoint'")
-    && craneHomepageAdapterSource.includes("className: 'homepage-handoff-receiver--contact'")
+  !craneHomepageAdapterSource.includes('createHandoffReceiver')
+    && craneHomepageAdapterSource.includes('timeline?.update')
+    && craneHomepageAdapterSource.includes('playbackComplete')
     && craneHomepageAdapterSource.includes('handoffProgressSource'),
-  'Crane homepage transition must adopt the native Contact endpoint during handoff'
+  'Crane homepage transition must report timeline progress without adopting the native Contact endpoint'
 );
 assert.doesNotMatch(
   `${figure2HomepageAdapterSource}\n${homepageTransitionCss}\n${figure2Css}`,
@@ -494,8 +498,14 @@ assert.ok(
 assert.ok(
   ttgHomepageAdapterSource.includes('scene.renderRawProgress(progress, { syncVideo: false })')
     && ttgHomepageAdapterSource.includes('scene.enableGsapRendering(gsap)')
+    && ttgHomepageAdapterSource.includes('timeline?.update(progress')
     && ttgComponentSource.includes('figurePlaybackDrivesScene'),
   'TTG homepage transition must drive scenery from snap progress instead of video frame time'
+);
+assert.ok(
+  phHomepageAdapterSource.includes('timeline?.update(progress')
+    && phHomepageAdapterSource.includes('playbackComplete'),
+  'PH visual bridge must present Education through the homepage timeline'
 );
 assert.doesNotMatch(
   ttgHomepageAdapterSource,

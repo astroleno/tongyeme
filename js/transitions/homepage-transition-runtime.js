@@ -1,5 +1,6 @@
 import { homepageTransitionRegistry } from './homepage-transition-registry.js';
 import { createSectionPresentationController } from './homepage/section-presentation-controller.js';
+import { createSceneTimelineController } from './homepage/scene-timeline-controller.js';
 
 const NAMED_TRANSITION_SELECTOR = [
   '.chapter-transition[data-transition-module]',
@@ -87,6 +88,7 @@ function isDirectHashTargetForController(controller) {
 function shouldGateTargetReveal(controller) {
   return Boolean(
     controller?.handoffTarget
+    && !controller.timelineJoin
     && !controller.handoffId
     && !controller.handoffPhase
   );
@@ -206,11 +208,12 @@ function createNativeScrollTween() {
 function createHomepageSnapCoordinator({
   reduceMotion = false,
   scrollRuntime = null,
-  root = document
+  root = document,
+  presentationController = createSectionPresentationController({ root }),
+  sceneTimeline = null
 } = {}) {
   const lenis = getScrollRuntimeLenis(scrollRuntime);
   const nativeTween = createNativeScrollTween();
-  const presentationController = createSectionPresentationController({ root });
   const originalLenisScrollTo = lenis?.scrollTo || null;
   const controllers = [];
   let activeController = null;
@@ -457,8 +460,13 @@ function createHomepageSnapCoordinator({
     window.requestAnimationFrame?.(() => window.ScrollTrigger?.refresh?.());
   };
 
+  const clearSnapVisualState = (controller) => {
+    controller?.host?.removeAttribute('data-snap-state');
+  };
+
   const finishPlayback = (controller, { releaseTargetGate = true } = {}) => {
     controller.host.classList.remove('homepage-transition--snapped', 'homepage-transition--playing');
+    clearSnapVisualState(controller);
     syncFixedStageState(controller);
     if (releaseTargetGate) releaseTargetRevealGate(controller);
     inputLockUntil = performance.now() + POST_SNAP_INPUT_LOCK_MS;
@@ -510,6 +518,7 @@ function createHomepageSnapCoordinator({
     controller.handoffComplete = true;
     controller.playedForward = true;
     controller.host.classList.remove(FIXED_STAGE_CLASS);
+    clearSnapVisualState(controller);
     if (!controller.directHashHandoffComplete) {
       notifyHandoffComplete(controller);
       controller.directHashHandoffComplete = true;
@@ -657,6 +666,7 @@ function createHomepageSnapCoordinator({
       controller.playhead = 0;
       controller.handoffComplete = false;
       controller.host.classList.remove(FIXED_STAGE_CLASS);
+      clearSnapVisualState(controller);
       releaseTargetRevealGate(controller);
     }
 
@@ -733,6 +743,7 @@ function createHomepageSnapCoordinator({
       );
       const controller = {
         host,
+        timelineJoin: sceneTimeline?.getJoinForHost(host) || null,
         playhead: reduceMotion ? 1 : 0,
         playMs: Number(host.dataset.transitionPlayMs) || MODULE_PLAY_MS[moduleName] || DEFAULT_PLAY_MS,
         stageStops: parseNumberList(host.dataset.transitionStageStops, { min: 0, max: 1 }).sort((a, b) => a - b),
@@ -778,6 +789,7 @@ function createHomepageSnapCoordinator({
           clearDirectHashAlignmentTimers(this);
           releaseTargetRevealGate(this);
           this.host.classList.remove(FIXED_STAGE_CLASS);
+          clearSnapVisualState(this);
           cancelAnimationFrame(this.raf);
         }
       };
@@ -828,7 +840,15 @@ export async function initHomepageTransitions({
 } = {}) {
   const cleanup = createCleanupStack();
   const hosts = [...root.querySelectorAll(NAMED_TRANSITION_SELECTOR)];
-  const snapCoordinator = createHomepageSnapCoordinator({ root, reduceMotion, scrollRuntime });
+  const presentationController = createSectionPresentationController({ root });
+  const sceneTimeline = createSceneTimelineController({ root, presentationController });
+  const snapCoordinator = createHomepageSnapCoordinator({
+    root,
+    reduceMotion,
+    scrollRuntime,
+    presentationController,
+    sceneTimeline
+  });
   cleanup.add(snapCoordinator);
 
   await Promise.all(hosts.map(async (host) => {
@@ -859,6 +879,7 @@ export async function initHomepageTransitions({
       const handoffProgressSource = snapController?.handoffPhase === HANDOFF_POST_SCROLL
         ? snapController.postProgressSource.bind(snapController)
         : progressSource;
+      const timeline = sceneTimeline.createAdapterContext(host);
       const adapterModule = await loadAdapter();
       const mount = adapterModule.mountHomepageTransition || adapterModule.mountPatternBloomTransition;
       if (typeof mount !== 'function') {
@@ -872,6 +893,7 @@ export async function initHomepageTransitions({
         postProgressSource: snapController?.postProgressSource?.bind(snapController),
         handoffTarget,
         handoffProgressSource,
+        timeline,
         addCleanup: cleanup.add,
         gsap,
         ScrollTrigger

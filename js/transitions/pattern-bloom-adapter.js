@@ -8,8 +8,8 @@ const smoothStep = (value) => value * value * (3 - 2 * value);
 const REVEAL_END = 0.46;
 const BLOOM_START = 0.42;
 const BLOOM_END = 0.70;
-const SECOND_REVEAL_START = 0.58;
-const SECOND_REVEAL_END = 0.985;
+const SECOND_REVEAL_START = 0.50;
+const SECOND_REVEAL_END = 0.86;
 const BELIEF_PIN_CLASS = 'is-pattern-bloom-pinned';
 const COVER_PRIOR_SCENE_CLASS = 'is-pattern-bloom-covering';
 
@@ -36,6 +36,7 @@ export function mountPatternBloomTransition({
   host,
   reduceMotion = false,
   progressSource,
+  timeline,
   addCleanup
 } = {}) {
   if (!host || host.dataset.patternBloomMounted === 'true') {
@@ -189,20 +190,31 @@ export function mountPatternBloomTransition({
     const canvasRevealed = sceneReady && revealProgress >= 0.998;
     const secondRevealProgress = smoothStep(range01(progress, SECOND_REVEAL_START, SECOND_REVEAL_END));
     const topSceneExit = smoothStep(range01(secondRevealProgress, 0.68, 0.98));
-    const beliefPinned = overlayActive && secondRevealProgress > 0.002;
     const lotusOpacity = 1 - topSceneExit;
+    const timelineState = timeline?.update(progress, {
+      reason: 'pattern-bloom-render',
+      milestones: {
+        lotusContracted: topSceneExit >= 0.86,
+        targetReady: Boolean(beliefSection && sceneReady),
+        beliefCopyComplete: secondRevealProgress >= 0.998
+      }
+    });
+    const sourceOpacity = timelineState?.sourceOpacity ?? lotusOpacity;
+    const targetOpacity = timelineState?.targetOpacity ?? secondRevealProgress;
+    const beliefPinned = overlayActive && targetOpacity > 0.002;
     const topSceneOpacity = canvasRevealed && secondRevealProgress < 0.998
-      ? Math.min(lotusOpacity, beliefPinned ? 0.18 : 1)
+      ? Math.min(lotusOpacity, sourceOpacity)
       : 0;
     const beliefSceneOpacity = beliefPinned
-      ? Math.max(0.86, smoothStep(range01(secondRevealProgress, 0.002, 0.18)))
+      ? Math.max(0.86, targetOpacity)
       : 0;
     const beliefCopyProgress = beliefPinned
-      ? Math.max(0.92, smoothStep(range01(secondRevealProgress, 0.002, 0.16)))
+      ? targetOpacity
       : 0;
     const lotusVisible = topSceneOpacity > 0.002;
 
-    doc.body?.classList.toggle(COVER_PRIOR_SCENE_CLASS, overlayActive && revealProgress > 0.92);
+    const coverPriorScene = overlayActive && sceneReady && (canvasRevealed || beliefPinned);
+    doc.body?.classList.toggle(COVER_PRIOR_SCENE_CLASS, coverPriorScene);
     setBeliefTransitionState({
       pinned: beliefPinned,
       sceneOpacity: beliefSceneOpacity,
